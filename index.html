@@ -636,28 +636,36 @@
             localStorage.setItem('last_active_resource', name);
             document.getElementById('current-file-label').innerText = `/${name}.json`;
 
-            const res = await fetch(`/api/v1/${name}`);
+            const filterQuery = document.getElementById('filter-input')?.value.trim() || '';
+            const url = filterQuery 
+                ? `/api/v1/${name}?filter=${encodeURIComponent(filterQuery)}`
+                : `/api/v1/${name}`;
+            
+            const res = await fetch(url);
             const data = await res.json();
 
             editor.setValue(JSON.stringify(data, null, 4));
-            tableData = data || [];
-            filteredData = [...tableData];
-            currentFilter = document.getElementById('filter-input')?.value || '';
+            filteredData = data || [];
+            if (currentView === 'table') renderTable();
 
             refreshProjectList();
             runTransform();
             checkSchema();
-            if (currentView === 'table') renderTable();
         }
 
         async function refreshData() {
             if (!activeProject) return;
-            const res = await fetch(`/api/v1/${activeProject}`);
+            const filterQuery = document.getElementById('filter-input').value.trim();
+            const url = filterQuery 
+                ? `/api/v1/${activeProject}?filter=${encodeURIComponent(filterQuery)}`
+                : `/api/v1/${activeProject}`;
+            
+            const res = await fetch(url);
             const data = await res.json();
+            
             editor.setValue(JSON.stringify(data, null, 4));
-            tableData = data || [];
-            currentFilter = document.getElementById('filter-input')?.value || '';
-            applyFilter();
+            filteredData = data || [];
+            renderTable();
             document.getElementById('status').innerText = "🔄 Refreshed " + new Date().toLocaleTimeString();
         }
 
@@ -715,24 +723,18 @@
         async function applyFilter() {
             const filterQuery = document.getElementById('filter-input').value.trim();
 
-            if (!filterQuery) {
-                filteredData = [...tableData];
-                renderTable();
-                return;
-            }
-
             try {
-                const res = await fetch(`/api/v1/${activeProject}?filter=${encodeURIComponent(filterQuery)}`);
+                const url = filterQuery 
+                    ? `/api/v1/${activeProject}?filter=${encodeURIComponent(filterQuery)}`
+                    : `/api/v1/${activeProject}`;
+                
+                const res = await fetch(url);
                 if (res.ok) {
                     filteredData = await res.json();
                     renderTable();
-                } else {
-                    filteredData = [...tableData];
-                    renderTable();
                 }
             } catch (e) {
-                filteredData = [...tableData];
-                renderTable();
+                console.error('Filter error:', e);
             }
         }
 
@@ -970,10 +972,16 @@
                 if (res.ok) {
                     document.getElementById('save-btn').innerText = "Save (Ctrl+S)";
                     document.getElementById('status').innerText = "✅ Saved " + new Date().toLocaleTimeString();
-                    editor.setValue(JSON.stringify(tableData, null, 4));
-                    filteredData = currentFilter
-                        ? tableData.filter(item => Object.values(item).some(val => JSON.stringify(val).toLowerCase().includes(currentFilter)))
-                        : [...tableData];
+                    
+                    const filterQuery = document.getElementById('filter-input').value.trim();
+                    const filterUrl = filterQuery 
+                        ? `?filter=${encodeURIComponent(filterQuery)}`
+                        : '';
+                    const dataRes = await fetch(`/api/v1/${activeProject}${filterUrl}`);
+                    const data = await dataRes.json();
+                    editor.setValue(JSON.stringify(data, null, 4));
+                    filteredData = data || [];
+                    renderTable();
                 } else {
                     const err = await res.json();
                     document.getElementById('save-btn').innerText = "Save (Ctrl+S)";
