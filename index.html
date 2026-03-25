@@ -636,16 +636,12 @@
             localStorage.setItem('last_active_resource', name);
             document.getElementById('current-file-label').innerText = `/${name}.json`;
 
-            const filterQuery = document.getElementById('filter-input')?.value.trim() || '';
-            const url = filterQuery 
-                ? `/api/v1/${name}?filter=${encodeURIComponent(filterQuery)}`
-                : `/api/v1/${name}`;
-            
-            const res = await fetch(url);
+            const res = await fetch(`/api/v1/${name}`);
             const data = await res.json();
 
             editor.setValue(JSON.stringify(data, null, 4));
-            filteredData = data || [];
+            tableData = data || [];
+            filteredData = [...tableData];
             if (currentView === 'table') renderTable();
 
             refreshProjectList();
@@ -655,16 +651,19 @@
 
         async function refreshData() {
             if (!activeProject) return;
-            const filterQuery = document.getElementById('filter-input').value.trim();
-            const url = filterQuery 
-                ? `/api/v1/${activeProject}?filter=${encodeURIComponent(filterQuery)}`
-                : `/api/v1/${activeProject}`;
             
-            const res = await fetch(url);
-            const data = await res.json();
+            const [allRes, filteredRes] = await Promise.all([
+                fetch(`/api/v1/${activeProject}`),
+                fetch(`/api/v1/${activeProject}${document.getElementById('filter-input').value.trim() ? '?filter=' + encodeURIComponent(document.getElementById('filter-input').value.trim()) : ''}`)
+            ]);
             
-            editor.setValue(JSON.stringify(data, null, 4));
-            filteredData = data || [];
+            const allData = await allRes.json();
+            const filtered = await filteredRes.json();
+            
+            tableData = allData || [];
+            filteredData = filtered || [];
+            
+            editor.setValue(JSON.stringify(tableData, null, 4));
             renderTable();
             document.getElementById('status').innerText = "🔄 Refreshed " + new Date().toLocaleTimeString();
         }
@@ -697,8 +696,8 @@
 
             document.getElementById('table-header').innerHTML = '<tr>' + columns.map(c => `<th>${c}</th>`).join('') + '<th style="width:150px;">Actions</th></tr>';
 
-            document.getElementById('table-body').innerHTML = dataToShow.map((item, idx) => {
-                const originalIdx = tableData.indexOf(item);
+            document.getElementById('table-body').innerHTML = dataToShow.map((item) => {
+                const originalIdx = tableData.findIndex(t => t.id === item.id || JSON.stringify(t) === JSON.stringify(item));
                 return '<tr>' + columns.map(col => {
                     const val = item[col] !== undefined ? JSON.stringify(item[col]) : '';
                     return `<td><span style="white-space:nowrap;text-overflow:ellipsis;overflow:hidden;display:block;">${escapeHtml(val)}</span></td>`;
@@ -974,13 +973,14 @@
                     document.getElementById('status').innerText = "✅ Saved " + new Date().toLocaleTimeString();
                     
                     const filterQuery = document.getElementById('filter-input').value.trim();
-                    const filterUrl = filterQuery 
-                        ? `?filter=${encodeURIComponent(filterQuery)}`
-                        : '';
-                    const dataRes = await fetch(`/api/v1/${activeProject}${filterUrl}`);
-                    const data = await dataRes.json();
-                    editor.setValue(JSON.stringify(data, null, 4));
-                    filteredData = data || [];
+                    const [allRes, filteredRes] = await Promise.all([
+                        fetch(`/api/v1/${activeProject}`),
+                        filterQuery ? fetch(`/api/v1/${activeProject}?filter=${encodeURIComponent(filterQuery)}`) : Promise.resolve({ json: () => [] })
+                    ]);
+                    
+                    tableData = await allRes.json() || [];
+                    filteredData = filterQuery ? (await filteredRes.json() || []) : [...tableData];
+                    editor.setValue(JSON.stringify(tableData, null, 4));
                     renderTable();
                 } else {
                     const err = await res.json();
