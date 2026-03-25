@@ -2,6 +2,7 @@ services:
   api-manager:
     build: .
     container_name: json-api-manager
+    restart: unless-stopped
     ports:
       - "4545:8000"
     volumes:
