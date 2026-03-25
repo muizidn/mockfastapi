@@ -61,19 +61,19 @@
             letter-spacing: 1px;
         }
 
-        #new-project-zone {
+        #new-resource-zone {
             padding: 10px;
             display: flex;
             gap: 5px;
             background: #2d2d2d;
         }
 
-        #project-list {
+        #resource-list {
             flex: 1;
             overflow-y: auto;
         }
 
-        .project-item {
+        .resource-item {
             padding: 8px 15px;
             cursor: pointer;
             display: flex;
@@ -83,11 +83,11 @@
             transition: 0.1s;
         }
 
-        .project-item:hover {
+        .resource-item:hover {
             background: #2a2d2e;
         }
 
-        .project-item.active {
+        .resource-item.active {
             background: #37373d;
             color: white;
             border-left: 3px solid var(--accent);
@@ -100,7 +100,7 @@
             transition: 0.2s;
         }
 
-        .project-item:hover .item-actions {
+        .resource-item:hover .item-actions {
             opacity: 1;
         }
 
@@ -201,11 +201,11 @@
     <div id="main">
         <div id="sidebar">
             <div id="sidebar-header">Resources</div>
-            <div id="new-project-zone">
+            <div id="new-resource-zone">
                 <input type="text" id="new-proj-input" placeholder="resource_name..." style="width: 100%;">
                 <button onclick="createNewProject()">+</button>
             </div>
-            <div id="project-list"></div>
+            <div id="resource-list"></div>
         </div>
 
         <div id="editor"></div>
@@ -250,8 +250,8 @@
 
             updateHistoryUI();
             refreshProjectList().then(() => {
-                // Load default or first project
-                const lastProj = localStorage.getItem('last_active_project');
+                // Load default or first resource
+                const lastProj = localStorage.getItem('last_active_resource');
                 if (lastProj) {
                     loadProject(lastProj);
                 }
@@ -260,12 +260,12 @@
 
         async function refreshProjectList() {
             try {
-                const res = await fetch('/api/v1/projects');
-                const projects = await res.json();
+                const res = await fetch('/api/v1/resources');
+                const resources = await res.json();
 
-                const list = document.getElementById('project-list');
-                list.innerHTML = projects.map(p => `
-                    <div class="project-item ${p === activeProject ? 'active' : ''}" onclick="loadProject('${p}')">
+                const list = document.getElementById('resource-list');
+                list.innerHTML = resources.map(p => `
+                    <div class="resource-item ${p === activeProject ? 'active' : ''}" onclick="loadProject('${p}')">
                         <span>${p}.json</span>
                         <div class="item-actions">
                             <a href="/docs/${p}" target="_blank" class="action-link" onclick="event.stopPropagation()">DOCS</a>
@@ -274,7 +274,7 @@
                     </div>
                 `).join('');
             } catch (e) {
-                console.error("Failed to fetch projects", e);
+                console.error("Failed to fetch resources", e);
             }
         }
 
@@ -283,7 +283,7 @@
             if (!name) return;
 
             // Create file with empty array
-            await fetch(`/api/v1/${name}`, {
+            await fetch(`/api/v1/${name}/bulk/update`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify([])
@@ -296,7 +296,7 @@
 
         async function deleteProject(name) {
             if (!confirm(`Permanently delete ${name}.json?`)) return;
-            await fetch(`/api/v1/projects/${name}`, { method: 'DELETE' });
+            await fetch(`/api/v1/resources/${name}`, { method: 'DELETE' });
             if (activeProject === name) activeProject = '';
             refreshProjectList();
             editor.setValue("[]");
@@ -304,7 +304,7 @@
 
         async function loadProject(name) {
             activeProject = name;
-            localStorage.setItem('last_active_project', name);
+            localStorage.setItem('last_active_resource', name);
             document.getElementById('current-file-label').innerText = `/${name}.json`;
 
             const res = await fetch(`/api/v1/${name}`);
@@ -333,7 +333,7 @@
             status.innerText = "";
 
             try {
-                await fetch(`/api/v1/${activeProject}`, {
+                await fetch(`/api/v1/${activeProject}/bulk/update`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: content
