@@ -1,0 +1,10 @@
+services:
+  api-manager:
+    build: .
+    container_name: json-api-manager
+    ports:
+      - "4545:8000"
+    volumes:
+      - .:/app
+      - ./data:/app/data
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload

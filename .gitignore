@@ -1,0 +1,19 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local Data (Your JSON "Database")
+# We ignore the contents of data but keep the folder if needed
+data/*.json
+
+# Environment & OS files
+.env
+.venv
+env/
+venv/
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore

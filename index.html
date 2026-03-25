@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>JSON Project IDE</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <style>
+        :root {
+            --bg: #1e1e1e;
+            --panel: #252526;
+            --sidebar: #333333;
+            --accent: #007acc;
+            --border: #444;
+        }
+
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            font-family: 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: #cccccc;
+            overflow: hidden;
+        }
+
+        /* Layout */
+        #toolbar {
+            height: 40px;
+            padding: 0 20px;
+            background: var(--panel);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        #main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        #sidebar {
+            width: 220px;
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        #sidebar-header {
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #888;
+        }
+
+        #new-project-zone {
+            padding: 10px;
+            display: flex;
+            gap: 5px;
+        }
+
+        #project-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .project-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            transition: 0.2s;
+        }
+
+        .project-item:hover {
+            background: #2a2d2e;
+        }
+
+        .project-item.active {
+            background: #37373d;
+            color: white;
+            border-left: 2px solid var(--accent);
+        }
+
+        .btn-del {
+            color: #555;
+            font-weight: bold;
+            padding: 0 5px;
+        }
+
+        .btn-del:hover {
+            color: #ff4444;
+        }
+
+        /* Editor & Panel */
+        #editor {
+            flex: 1;
+            min-width: 0;
+        }
+
+        #side-panel {
+            width: 350px;
+            background: var(--panel);
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid var(--border);
+        }
+
+        .panel-header {
+            padding: 10px;
+            background: #2d2d2d;
+            font-size: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* UI Elements */
+        input,
+        select {
+            background: #3c3c3c;
+            color: white;
+            border: 1px solid var(--border);
+            padding: 4px 8px;
+            border-radius: 2px;
+            outline: none;
+        }
+
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 2px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        button:hover {
+            filter: brightness(1.2);
+        }
+
+        #output {
+            margin: 0;
+            padding: 10px;
+            flex: 1;
+            background: #1e1e1e;
+            color: #9cdcfe;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            overflow: auto;
+            white-space: pre-wrap;
+        }
+
+        .status-msg {
+            font-size: 11px;
+            color: #888;
+            margin-left: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="toolbar">
+        <strong>JSON IDE</strong>
+        <span id="current-file-label" style="color: #61afef; font-size: 13px;"></span>
+        <button onclick="saveFullFile()" id="save-btn" style="background: #28a745;">Save (Ctrl+S)</button>
+        <span id="status" class="status-msg"></span>
+    </div>
+
+    <div id="main">
+        <div id="sidebar">
+            <div id="sidebar-header">Resources</div>
+            <div id="new-project-zone">
+                <input type="text" id="new-proj-input" placeholder="filename..." style="width: 100%;">
+                <button onclick="createNewProject()">+</button>
+            </div>
+            <div id="project-list"></div>
+        </div>
+
+        <div id="editor"></div>
+
+        <div id="side-panel">
+            <div class="panel-header">TRANSFORMATION QUERY</div>
+            <div style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+                <input type="text" id="query" placeholder="data.filter(x => x.active)" oninput="runTransform()">
+                <div style="display: flex; gap: 5px;">
+                    <button onclick="saveQuery()" style="flex: 1; background: #444;">Cache Query</button>
+                    <select id="queryHistory" onchange="loadQuery(this.value)" style="flex: 2;">
+                        <option value="">Recent...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="panel-header">RESULT PREVIEW</div>
+            <pre id="output"></pre>
+        </div>
+    </div>
+
+    <script>
+        let editor;
+        let activeProject = '';
+        const CACHE_KEY = 'json_transform_cache';
+
+        require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
+        require(['vs/editor/editor.main'], function () {
+            editor = monaco.editor.create(document.getElementById('editor'), {
+                value: "[]", language: 'json', theme: 'vs-dark', automaticLayout: true,
+                fontSize: 13, minimap: { enabled: false }
+            });
+
+            // Add Save Command (Ctrl+S)
+            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => saveFullFile());
+
+            updateHistoryUI();
+            refreshProjectList().then(() => {
+                if (activeProject) loadProject(activeProject);
+            });
+        });
+
+        async function refreshProjectList() {
+            const res = await fetch('/api/v1/projects');
+            const projects = await res.json();
+
+            const list = document.getElementById('project-list');
+            list.innerHTML = projects.map(p => `
+                <div class="project-item ${p === activeProject ? 'active' : ''}" onclick="loadProject('${p}')">
+                    <span>${p}.json</span>
+                    <div style="display:flex; gap:10px;">
+                        <a href="/docs/${p}" target="_blank" style="text-decoration:none; font-size:10px; color:#007acc;">DOCS</a>
+                        <span class="btn-del" onclick="event.stopPropagation(); deleteProject('${p}')">×</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function createNewProject() {
+            const name = document.getElementById('new-proj-input').value.trim().replace('.json', '');
+            if (!name) return;
+            await fetch(`/api/v1/${name}/items`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify([])
+            });
+            document.getElementById('new-proj-input').value = '';
+            loadProject(name);
+        }
+
+        async function deleteProject(name) {
+            if (!confirm(`Permanently delete ${name}.json?`)) return;
+            await fetch(`/api/v1/projects/${name}`, { method: 'DELETE' });
+            if (activeProject === name) activeProject = '';
+            refreshProjectList();
+        }
+
+        async function loadProject(name) {
+            activeProject = name;
+            document.getElementById('current-file-label').innerText = `Editing: ${name}.json`;
+            const res = await fetch(`/api/v1/${name}/items`);
+            const data = await res.json();
+            editor.setValue(JSON.stringify(data, null, 4));
+            refreshProjectList();
+            runTransform();
+        }
+
+        async function saveFullFile() {
+            if (!activeProject) return;
+            const content = editor.getValue();
+            try { JSON.parse(content); } catch (e) {
+                document.getElementById('status').innerText = "❌ Invalid JSON";
+                return;
+            }
+
+            const btn = document.getElementById('save-btn');
+            btn.innerText = "Saving...";
+
+            await fetch(`/api/v1/${activeProject}/items`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: content
+            });
+
+            btn.innerText = "Save (Ctrl+S)";
+            document.getElementById('status').innerText = "✅ Saved at " + new Date().toLocaleTimeString();
+        }
+
+        function runTransform() {
+            const outputElement = document.getElementById('output');
+            try {
+                const query = String(document.getElementById('query').value || "").trim();
+                const data = JSON.parse(editor.getValue());
+
+                if (!query) {
+                    outputElement.innerText = JSON.stringify(data, null, 2);
+                    return;
+                }
+
+                // We inject '_' into the function scope so you can use Lodash commands
+                const transformFunc = new Function('data', '_', `
+            try {
+                // If it looks like a Lodash chain or command, evaluate it
+                // e.g., _.filter(data, {gpa: 4}) or _.chain(data)...
+                return eval(\`${query}\`);
+            } catch (e) {
+                return "Logic Error: " + e.message;
+            }
+        `);
+
+                const result = transformFunc(data, _);
+                outputElement.innerText = JSON.stringify(result, null, 2);
+                outputElement.style.color = "#9cdcfe";
+            } catch (e) {
+                outputElement.innerText = "// Syntax Error: " + e.message;
+                outputElement.style.color = "#f44747";
+            }
+        }
+
+        // --- Transformation Cache Logic ---
+        function saveQuery() {
+            const q = document.getElementById('query').value;
+            if (!q) return;
+            let cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '[]');
+            cache = [q, ...cache.filter(x => x !== q)].slice(0, 15);
+            localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+            updateHistoryUI();
+        }
+
+        function loadQuery(val) {
+            if (!val) return;
+            document.getElementById('query').value = val;
+            runTransform();
+        }
+
+        function updateHistoryUI() {
+            const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '[]');
+            const select = document.getElementById('queryHistory');
+            select.innerHTML = '<option value="">Recent Queries...</option>' +
+                cache.map(q => `<option value="${q}">${q}</option>`).join('');
+        }
+    </script>
+</body>
+
+</html>
