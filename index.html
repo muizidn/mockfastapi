@@ -495,7 +495,7 @@
 
             <div id="table-view">
                 <div class="crud-toolbar">
-                    <input type="text" id="filter-input" placeholder="Filter: _.filter(data, {status: 'Active'})"
+                    <input type="text" id="filter-input" placeholder="Filter: name fuzzy 'john' or _.filter(data, {status: 'Active'})"
                         oninput="applyFilter()">
                     <button onclick="showFilterHelp()" style="background:#666;padding:5px 8px;"
                         title="Filter Help">?</button>
@@ -526,6 +526,11 @@
                         <p><strong style="color:#6f42c1;">Simple (text search):</strong></p>
                         <code style="background:#333;padding:2px 4px;border-radius:2px;">Active</code><br>
                         <code style="background:#333;padding:2px 4px;border-radius:2px;">admin</code>
+                        <p><strong style="color:#6f42c1;">Field operators:</strong></p>
+                        <code style="background:#333;padding:2px 4px;border-radius:2px;">status == Active</code><br>
+                        <code style="background:#333;padding:2px 4px;border-radius:2px;">age &gt; 21</code><br>
+                        <code style="background:#333;padding:2px 4px;border-radius:2px;">name fuzzy "john"</code><br>
+                        <code style="background:#333;padding:2px 4px;border-radius:2px;">name regex "^ad"</code>
                     </div>
                 </div>
                 <div class="table-container">
