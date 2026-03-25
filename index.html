@@ -680,7 +680,7 @@
         }
 
         function renderTable() {
-            const dataToShow = currentFilter ? filteredData : tableData;
+            const dataToShow = filteredData || [];
 
             if (dataToShow.length === 0) {
                 document.getElementById('table-header').innerHTML = '';
@@ -697,7 +697,7 @@
             document.getElementById('table-header').innerHTML = '<tr>' + columns.map(c => `<th>${c}</th>`).join('') + '<th style="width:150px;">Actions</th></tr>';
 
             document.getElementById('table-body').innerHTML = dataToShow.map((item) => {
-                const originalIdx = tableData.findIndex(t => t.id === item.id || JSON.stringify(t) === JSON.stringify(item));
+                const originalIdx = tableData.findIndex(t => t.id === item.id);
                 return '<tr>' + columns.map(col => {
                     const val = item[col] !== undefined ? JSON.stringify(item[col]) : '';
                     return `<td><span style="white-space:nowrap;text-overflow:ellipsis;overflow:hidden;display:block;">${escapeHtml(val)}</span></td>`;
