@@ -195,7 +195,24 @@
         <strong>JSON IDE</strong>
         <span id="current-file-label" style="color: #61afef; font-size: 13px; font-family: monospace;"></span>
         <button onclick="saveFullFile()" id="save-btn" style="background: #28a745;">Save (Ctrl+S)</button>
+        <button onclick="openSchemaModal()" id="schema-btn" style="background: #6f42c1;">Set Schema</button>
+        <span id="schema-indicator" class="status-msg" style="color: #6f42c1;"></span>
         <span id="status" class="status-msg"></span>
+    </div>
+
+    <div id="schema-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1000; justify-content:center; align-items:center;">
+        <div style="background:var(--panel); padding:20px; border-radius:4px; width:600px; max-height:80vh; display:flex; flex-direction:column; gap:15px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:bold; font-size:14px;">JSON Schema for <span id="schema-resource-name"></span></span>
+                <button onclick="closeSchemaModal()" style="background:#444;">✕</button>
+            </div>
+            <div id="schema-editor" style="flex:1; min-height:300px; border:1px solid var(--border);"></div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button onclick="deleteSchema()" id="delete-schema-btn" style="background:#dc3545;">Delete Schema</button>
+                <button onclick="saveSchema()" style="background:#28a745;">Save Schema</button>
+            </div>
+            <div id="schema-status" class="status-msg"></div>
+        </div>
     </div>
 
     <div id="main">
@@ -228,6 +245,7 @@
 
     <script>
         let editor;
+        let schemaEditor;
         let activeProject = '';
         const CACHE_KEY = 'json_transform_cache';
 
@@ -313,6 +331,20 @@
             editor.setValue(JSON.stringify(data, null, 4));
             refreshProjectList();
             runTransform();
+            checkSchema();
+        }
+
+        async function checkSchema() {
+            try {
+                const res = await fetch(`/api/v1/${activeProject}/schema`);
+                if (res.ok) {
+                    document.getElementById('schema-indicator').innerText = '✓ Schema';
+                } else {
+                    document.getElementById('schema-indicator').innerText = '';
+                }
+            } catch (e) {
+                document.getElementById('schema-indicator').innerText = '';
+            }
         }
 
         async function saveFullFile() {
@@ -333,14 +365,20 @@
             status.innerText = "";
 
             try {
-                await fetch(`/api/v1/${activeProject}/bulk/update`, {
+                const res = await fetch(`/api/v1/${activeProject}/bulk/update`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: content
                 });
 
-                btn.innerText = "Save (Ctrl+S)";
-                status.innerText = "✅ Saved " + new Date().toLocaleTimeString();
+                if (res.ok) {
+                    btn.innerText = "Save (Ctrl+S)";
+                    status.innerText = "✅ Saved " + new Date().toLocaleTimeString();
+                } else {
+                    const err = await res.json();
+                    btn.innerText = "Save (Ctrl+S)";
+                    status.innerText = "❌ " + (err.detail || 'Save Failed');
+                }
             } catch (e) {
                 btn.innerText = "Save (Ctrl+S)";
                 status.innerText = "❌ Save Failed";
@@ -397,6 +435,97 @@
             const select = document.getElementById('queryHistory');
             select.innerHTML = '<option value="">Recent Queries...</option>' +
                 cache.map(q => `<option value="${q}">${q.substring(0, 40)}${q.length > 40 ? '...' : ''}</option>`).join('');
+        }
+
+        async function openSchemaModal() {
+            if (!activeProject) return;
+            document.getElementById('schema-resource-name').innerText = activeProject;
+            document.getElementById('schema-modal').style.display = 'flex';
+
+            if (!schemaEditor) {
+                require(['vs/editor/editor.main'], function () {
+                    schemaEditor = monaco.editor.create(document.getElementById('schema-editor'), {
+                        value: "{\n  \"type\": \"object\",\n  \"properties\": {\n    \n  }\n}",
+                        language: 'json',
+                        theme: 'vs-dark',
+                        automaticLayout: true,
+                        fontSize: 13,
+                        minimap: { enabled: false }
+                    });
+                    loadSchema();
+                });
+            } else {
+                loadSchema();
+            }
+        }
+
+        function closeSchemaModal() {
+            document.getElementById('schema-modal').style.display = 'none';
+        }
+
+        async function loadSchema() {
+            try {
+                const res = await fetch(`/api/v1/${activeProject}/schema`);
+                if (res.ok) {
+                    const schema = await res.json();
+                    schemaEditor.setValue(JSON.stringify(schema, null, 4));
+                    document.getElementById('schema-indicator').innerText = '✓ Schema';
+                } else {
+                    schemaEditor.setValue("{\n  \"type\": \"object\",\n  \"properties\": {\n    \n  }\n}");
+                    document.getElementById('schema-indicator').innerText = '';
+                }
+            } catch (e) {
+                schemaEditor.setValue("{\n  \"type\": \"object\",\n  \"properties\": {\n    \n  }\n}");
+                document.getElementById('schema-indicator').innerText = '';
+            }
+        }
+
+        async function saveSchema() {
+            const content = schemaEditor.getValue();
+            const status = document.getElementById('schema-status');
+
+            try {
+                JSON.parse(content);
+            } catch (e) {
+                status.innerText = "❌ Invalid JSON";
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/v1/${activeProject}/schema`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: content
+                });
+
+                if (res.ok) {
+                    status.innerText = "✅ Schema saved";
+                    document.getElementById('schema-indicator').innerText = '✓ Schema';
+                } else {
+                    const err = await res.json();
+                    status.innerText = "❌ " + (err.detail || 'Failed to save schema');
+                }
+            } catch (e) {
+                status.innerText = "❌ Save failed";
+            }
+        }
+
+        async function deleteSchema() {
+            if (!confirm('Delete schema for this resource?')) return;
+
+            try {
+                const res = await fetch(`/api/v1/${activeProject}/schema`, {
+                    method: 'DELETE'
+                });
+
+                if (res.ok) {
+                    document.getElementById('schema-status').innerText = "✅ Schema deleted";
+                    document.getElementById('schema-indicator').innerText = '';
+                    closeSchemaModal();
+                }
+            } catch (e) {
+                document.getElementById('schema-status').innerText = "❌ Delete failed";
+            }
         }
     </script>
 </body>

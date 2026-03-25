@@ -8,20 +8,23 @@ import os
 import glob
 import re
 import operator
+import jsonschema
+from jsonschema import ValidationError
 
 app = FastAPI(title="JSON Project IDE")
 DATA_DIR = "./data"
+SCHEMA_DIR = "./data/schema"
 
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
+if not os.path.exists(SCHEMA_DIR):
+    os.makedirs(SCHEMA_DIR)
 
 # --- FILTER ENGINE ---
 
 
 def evaluate_condition(item: Dict, condition: str) -> bool:
-    """Parses 'field op value' logic. Now supports 'regex' operator."""
     try:
-        # Added 'regex' to the operator list
         match = re.match(r"(\w+)\s*(==|!=|>=|<=|>|<|regex)\s*(.+)", condition.strip())
         if not match:
             return False
@@ -32,14 +35,11 @@ def evaluate_condition(item: Dict, condition: str) -> bool:
         if item_val is None:
             return False
 
-        # Cleaning value quotes
         val = raw_val.strip().strip("'").strip('"')
 
-        # Regex specific logic
         if op_str == "regex":
             return bool(re.search(val, str(item_val), re.IGNORECASE))
 
-        # Standard comparison logic with type casting
         try:
             if "." in val:
                 val, item_val = float(val), float(item_val)
@@ -62,14 +62,12 @@ def evaluate_condition(item: Dict, condition: str) -> bool:
 
 
 def apply_complex_filter(data: List[Dict], filter_str: str) -> List[Dict]:
-    """Evaluates logic strings. Supports: (a > 1 AND b regex '^test') OR c == 1"""
     if not filter_str:
         return data
 
     filtered_results = []
     for item in data:
         processed_query = filter_str
-        # Find all conditions including the new 'regex' keyword
         conditions = re.findall(
             r"(\w+\s*(?:==|!=|>=|<=|>|<|regex)\s*[^()&| ]+)", filter_str
         )
@@ -108,11 +106,43 @@ def save_resource_data(resource: str, data: Any):
         json.dump(data, f, indent=4)
 
 
+def get_resource_schema(resource: str) -> Optional[Dict]:
+    path = os.path.join(SCHEMA_DIR, f"{resource}.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return None
+
+
+def save_resource_schema(resource: str, schema: Dict):
+    path = os.path.join(SCHEMA_DIR, f"{resource}.json")
+    with open(path, "w") as f:
+        json.dump(schema, f, indent=4)
+
+
+def delete_resource_schema(resource: str):
+    path = os.path.join(SCHEMA_DIR, f"{resource}.json")
+    if os.path.exists(path):
+        os.remove(path)
+
+
+def validate_against_schema(data: Any, schema: Dict) -> tuple[bool, Optional[str]]:
+    try:
+        jsonschema.validate(instance=data, schema=schema)
+        return True, None
+    except ValidationError as e:
+        return False, e.message
+    except Exception as e:
+        return False, str(e)
+
+
 # --- DYNAMIC OPENAPI GENERATOR ---
 
 
 def generate_openapi_spec(resource: str):
-    """Generates spec WITHOUT /items/ in the paths"""
     base = f"/api/v1/{resource}"
     return {
         "openapi": "3.0.0",
@@ -192,6 +222,26 @@ def generate_openapi_spec(resource: str):
                     "responses": {"200": {"description": "OK"}},
                 },
             },
+            f"{base}/schema": {
+                "get": {
+                    "tags": [resource],
+                    "summary": "Get Resource Schema",
+                    "responses": {"200": {"description": "OK"}},
+                },
+                "put": {
+                    "tags": [resource],
+                    "summary": "Set Resource Schema",
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"type": "object"}}}
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+                "delete": {
+                    "tags": [resource],
+                    "summary": "Delete Resource Schema",
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
         },
     }
 
@@ -220,13 +270,15 @@ async def list_resources():
 @app.delete("/api/v1/resources/{resource}")
 async def delete_resource_file(resource: str):
     path = os.path.join(DATA_DIR, f"{resource}.json")
+    schema_path = os.path.join(SCHEMA_DIR, f"{resource}.json")
     if os.path.exists(path):
         os.remove(path)
-        return {"message": "Project Deleted"}
-    raise HTTPException(status_code=404)
+    if os.path.exists(schema_path):
+        os.remove(schema_path)
+    return {"message": "Resource Deleted"}
 
 
-# --- CLEAN CRUD ROUTES (NO /items/) ---
+# --- CLEAN CRUD ROUTES ---
 
 
 @app.get("/api/v1/{resource}")
@@ -237,6 +289,14 @@ async def read_all(resource: str, filter: Optional[str] = Query(None)):
 
 @app.post("/api/v1/{resource}")
 async def create_item(resource: str, item: Dict[str, Any] = Body(...)):
+    schema = get_resource_schema(resource)
+    if schema:
+        valid, error = validate_against_schema(item, schema)
+        if not valid:
+            raise HTTPException(
+                status_code=400, detail=f"Schema validation failed: {error}"
+            )
+
     data = get_resource_data(resource)
     data.append(item)
     save_resource_data(resource, data)
@@ -245,6 +305,13 @@ async def create_item(resource: str, item: Dict[str, Any] = Body(...)):
 
 @app.post("/api/v1/{resource}/bulk/update")
 async def bulk_overwrite(resource: str, items: Any = Body(...)):
+    schema = get_resource_schema(resource)
+    if schema:
+        for i, item in enumerate(items):
+            valid, error = validate_against_schema(item, schema)
+            if not valid:
+                raise HTTPException(status_code=400, detail=f"Item {i}: {error}")
+
     save_resource_data(resource, items)
     return {"status": "ok"}
 
@@ -262,6 +329,14 @@ async def read_one(resource: str, item_id: str):
 async def update_item(
     resource: str, item_id: str, updated_item: Dict[str, Any] = Body(...)
 ):
+    schema = get_resource_schema(resource)
+    if schema:
+        valid, error = validate_against_schema(updated_item, schema)
+        if not valid:
+            raise HTTPException(
+                status_code=400, detail=f"Schema validation failed: {error}"
+            )
+
     data = get_resource_data(resource)
     for i, item in enumerate(data):
         if str(item.get("id")) == item_id:
@@ -277,6 +352,36 @@ async def delete_item(resource: str, item_id: str):
     new_data = [item for item in data if str(item.get("id")) != item_id]
     save_resource_data(resource, new_data)
     return {"message": "Deleted"}
+
+
+# --- SCHEMA ROUTES ---
+
+
+@app.get("/api/v1/{resource}/schema")
+async def get_schema(resource: str):
+    schema = get_resource_schema(resource)
+    if schema is None:
+        raise HTTPException(
+            status_code=404, detail="No schema defined for this resource"
+        )
+    return schema
+
+
+@app.put("/api/v1/{resource}/schema")
+async def set_schema(resource: str, schema: Dict = Body(...)):
+    try:
+        jsonschema.Draft7Validator.check_schema(schema)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid schema: {e}")
+
+    save_resource_schema(resource, schema)
+    return {"status": "ok"}
+
+
+@app.delete("/api/v1/{resource}/schema")
+async def delete_schema(resource: str):
+    delete_resource_schema(resource)
+    return {"status": "ok"}
 
 
 @app.get("/")
