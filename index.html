@@ -44,7 +44,7 @@
 
         /* Sidebar */
         #sidebar {
-            width: 220px;
+            width: 240px;
             background: var(--panel);
             border-right: 1px solid var(--border);
             display: flex;
@@ -52,18 +52,20 @@
         }
 
         #sidebar-header {
-            padding: 10px;
+            padding: 12px;
             border-bottom: 1px solid var(--border);
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
             text-transform: uppercase;
-            color: #888;
+            color: #666;
+            letter-spacing: 1px;
         }
 
         #new-project-zone {
             padding: 10px;
             display: flex;
             gap: 5px;
+            background: #2d2d2d;
         }
 
         #project-list {
@@ -78,7 +80,7 @@
             justify-content: space-between;
             align-items: center;
             font-size: 13px;
-            transition: 0.2s;
+            transition: 0.1s;
         }
 
         .project-item:hover {
@@ -88,13 +90,31 @@
         .project-item.active {
             background: #37373d;
             color: white;
-            border-left: 2px solid var(--accent);
+            border-left: 3px solid var(--accent);
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 8px;
+            opacity: 0.4;
+            transition: 0.2s;
+        }
+
+        .project-item:hover .item-actions {
+            opacity: 1;
+        }
+
+        .action-link {
+            text-decoration: none;
+            font-size: 10px;
+            color: var(--accent);
+            font-weight: bold;
         }
 
         .btn-del {
-            color: #555;
+            color: #888;
             font-weight: bold;
-            padding: 0 5px;
+            padding: 0 4px;
         }
 
         .btn-del:hover {
@@ -108,7 +128,7 @@
         }
 
         #side-panel {
-            width: 350px;
+            width: 380px;
             background: var(--panel);
             display: flex;
             flex-direction: column;
@@ -116,9 +136,11 @@
         }
 
         .panel-header {
-            padding: 10px;
+            padding: 10px 15px;
             background: #2d2d2d;
-            font-size: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #888;
             border-bottom: 1px solid var(--border);
         }
 
@@ -131,6 +153,7 @@
             padding: 4px 8px;
             border-radius: 2px;
             outline: none;
+            font-size: 12px;
         }
 
         button {
@@ -149,11 +172,11 @@
 
         #output {
             margin: 0;
-            padding: 10px;
+            padding: 12px;
             flex: 1;
-            background: #1e1e1e;
+            background: #1a1a1a;
             color: #9cdcfe;
-            font-family: 'Consolas', monospace;
+            font-family: 'Consolas', 'Courier New', monospace;
             font-size: 12px;
             overflow: auto;
             white-space: pre-wrap;
@@ -170,7 +193,7 @@
 <body>
     <div id="toolbar">
         <strong>JSON IDE</strong>
-        <span id="current-file-label" style="color: #61afef; font-size: 13px;"></span>
+        <span id="current-file-label" style="color: #61afef; font-size: 13px; font-family: monospace;"></span>
         <button onclick="saveFullFile()" id="save-btn" style="background: #28a745;">Save (Ctrl+S)</button>
         <span id="status" class="status-msg"></span>
     </div>
@@ -179,7 +202,7 @@
         <div id="sidebar">
             <div id="sidebar-header">Resources</div>
             <div id="new-project-zone">
-                <input type="text" id="new-proj-input" placeholder="filename..." style="width: 100%;">
+                <input type="text" id="new-proj-input" placeholder="resource_name..." style="width: 100%;">
                 <button onclick="createNewProject()">+</button>
             </div>
             <div id="project-list"></div>
@@ -188,13 +211,13 @@
         <div id="editor"></div>
 
         <div id="side-panel">
-            <div class="panel-header">TRANSFORMATION QUERY</div>
-            <div style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
-                <input type="text" id="query" placeholder="data.filter(x => x.active)" oninput="runTransform()">
-                <div style="display: flex; gap: 5px;">
-                    <button onclick="saveQuery()" style="flex: 1; background: #444;">Cache Query</button>
+            <div class="panel-header">TRANSFORMATION (LODASH SUPPORTED)</div>
+            <div style="padding: 15px; display: flex; flex-direction: column; gap: 10px;">
+                <input type="text" id="query" placeholder="_.filter(data, {status: 'Active'})" oninput="runTransform()">
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="saveQuery()" style="flex: 1; background: #444;">Cache</button>
                     <select id="queryHistory" onchange="loadQuery(this.value)" style="flex: 2;">
-                        <option value="">Recent...</option>
+                        <option value="">Recent Queries...</option>
                     </select>
                 </div>
             </div>
@@ -208,47 +231,66 @@
         let activeProject = '';
         const CACHE_KEY = 'json_transform_cache';
 
+        // Initialize Monaco
         require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
         require(['vs/editor/editor.main'], function () {
             editor = monaco.editor.create(document.getElementById('editor'), {
-                value: "[]", language: 'json', theme: 'vs-dark', automaticLayout: true,
-                fontSize: 13, minimap: { enabled: false }
+                value: "[]",
+                language: 'json',
+                theme: 'vs-dark',
+                automaticLayout: true,
+                fontSize: 13,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                lineNumbersMinChars: 3
             });
 
-            // Add Save Command (Ctrl+S)
+            // Set up Ctrl+S shortcut
             editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => saveFullFile());
 
             updateHistoryUI();
             refreshProjectList().then(() => {
-                if (activeProject) loadProject(activeProject);
+                // Load default or first project
+                const lastProj = localStorage.getItem('last_active_project');
+                if (lastProj) {
+                    loadProject(lastProj);
+                }
             });
         });
 
         async function refreshProjectList() {
-            const res = await fetch('/api/v1/projects');
-            const projects = await res.json();
+            try {
+                const res = await fetch('/api/v1/projects');
+                const projects = await res.json();
 
-            const list = document.getElementById('project-list');
-            list.innerHTML = projects.map(p => `
-                <div class="project-item ${p === activeProject ? 'active' : ''}" onclick="loadProject('${p}')">
-                    <span>${p}.json</span>
-                    <div style="display:flex; gap:10px;">
-                        <a href="/docs/${p}" target="_blank" style="text-decoration:none; font-size:10px; color:#007acc;">DOCS</a>
-                        <span class="btn-del" onclick="event.stopPropagation(); deleteProject('${p}')">×</span>
+                const list = document.getElementById('project-list');
+                list.innerHTML = projects.map(p => `
+                    <div class="project-item ${p === activeProject ? 'active' : ''}" onclick="loadProject('${p}')">
+                        <span>${p}.json</span>
+                        <div class="item-actions">
+                            <a href="/docs/${p}" target="_blank" class="action-link" onclick="event.stopPropagation()">DOCS</a>
+                            <span class="btn-del" onclick="event.stopPropagation(); deleteProject('${p}')">×</span>
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `).join('');
+            } catch (e) {
+                console.error("Failed to fetch projects", e);
+            }
         }
 
         async function createNewProject() {
             const name = document.getElementById('new-proj-input').value.trim().replace('.json', '');
             if (!name) return;
-            await fetch(`/api/v1/${name}/items`, {
+
+            // Create file with empty array
+            await fetch(`/api/v1/${name}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify([])
             });
+
             document.getElementById('new-proj-input').value = '';
+            await refreshProjectList();
             loadProject(name);
         }
 
@@ -257,13 +299,17 @@
             await fetch(`/api/v1/projects/${name}`, { method: 'DELETE' });
             if (activeProject === name) activeProject = '';
             refreshProjectList();
+            editor.setValue("[]");
         }
 
         async function loadProject(name) {
             activeProject = name;
-            document.getElementById('current-file-label').innerText = `Editing: ${name}.json`;
-            const res = await fetch(`/api/v1/${name}/items`);
+            localStorage.setItem('last_active_project', name);
+            document.getElementById('current-file-label').innerText = `/${name}.json`;
+
+            const res = await fetch(`/api/v1/${name}`);
             const data = await res.json();
+
             editor.setValue(JSON.stringify(data, null, 4));
             refreshProjectList();
             runTransform();
@@ -272,22 +318,33 @@
         async function saveFullFile() {
             if (!activeProject) return;
             const content = editor.getValue();
-            try { JSON.parse(content); } catch (e) {
+
+            try {
+                JSON.parse(content);
+            } catch (e) {
                 document.getElementById('status').innerText = "❌ Invalid JSON";
                 return;
             }
 
             const btn = document.getElementById('save-btn');
+            const status = document.getElementById('status');
+
             btn.innerText = "Saving...";
+            status.innerText = "";
 
-            await fetch(`/api/v1/${activeProject}/items`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: content
-            });
+            try {
+                await fetch(`/api/v1/${activeProject}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: content
+                });
 
-            btn.innerText = "Save (Ctrl+S)";
-            document.getElementById('status').innerText = "✅ Saved at " + new Date().toLocaleTimeString();
+                btn.innerText = "Save (Ctrl+S)";
+                status.innerText = "✅ Saved " + new Date().toLocaleTimeString();
+            } catch (e) {
+                btn.innerText = "Save (Ctrl+S)";
+                status.innerText = "❌ Save Failed";
+            }
         }
 
         function runTransform() {
@@ -301,19 +358,17 @@
                     return;
                 }
 
-                // We inject '_' into the function scope so you can use Lodash commands
+                // Injecting Lodash (_) and data into a temporary function
                 const transformFunc = new Function('data', '_', `
-            try {
-                // If it looks like a Lodash chain or command, evaluate it
-                // e.g., _.filter(data, {gpa: 4}) or _.chain(data)...
-                return eval(\`${query}\`);
-            } catch (e) {
-                return "Logic Error: " + e.message;
-            }
-        `);
+                    try {
+                        return eval(\`${query}\`);
+                    } catch (e) {
+                        return "Logic Error: " + e.message;
+                    }
+                `);
 
                 const result = transformFunc(data, _);
-                outputElement.innerText = JSON.stringify(result, null, 2);
+                outputElement.innerText = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
                 outputElement.style.color = "#9cdcfe";
             } catch (e) {
                 outputElement.innerText = "// Syntax Error: " + e.message;
@@ -341,7 +396,7 @@
             const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '[]');
             const select = document.getElementById('queryHistory');
             select.innerHTML = '<option value="">Recent Queries...</option>' +
-                cache.map(q => `<option value="${q}">${q}</option>`).join('');
+                cache.map(q => `<option value="${q}">${q.substring(0, 40)}${q.length > 40 ? '...' : ''}</option>`).join('');
         }
     </script>
 </body>
