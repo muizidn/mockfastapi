@@ -23,9 +23,26 @@ if not os.path.exists(SCHEMA_DIR):
 # --- FILTER ENGINE ---
 
 
+def fuzzy_match(text: str, pattern: str, threshold: float = 0.3) -> bool:
+    """Simple fuzzy matching - checks if pattern is subsequence of text"""
+    text = str(text).lower()
+    pattern = pattern.lower()
+    pattern_idx = 0
+    for char in text:
+        if pattern_idx < len(pattern) and char == pattern[pattern_idx]:
+            pattern_idx += 1
+    if pattern_idx == len(pattern):
+        return True
+    if len(pattern) < 3:
+        return pattern in text
+    return False
+
+
 def evaluate_condition(item: Dict, condition: str) -> bool:
     try:
-        match = re.match(r"(\w+)\s*(==|!=|>=|<=|>|<|regex)\s*(.+)", condition.strip())
+        match = re.match(
+            r"(\w+)\s*(==|!=|>=|<=|>|<|regex|fuzzy)\s*(.+)", condition.strip()
+        )
         if not match:
             return False
 
@@ -39,6 +56,9 @@ def evaluate_condition(item: Dict, condition: str) -> bool:
 
         if op_str == "regex":
             return bool(re.search(val, str(item_val), re.IGNORECASE))
+
+        if op_str == "fuzzy":
+            return fuzzy_match(item_val, val)
 
         try:
             if "." in val:
@@ -69,7 +89,7 @@ def apply_complex_filter(data: List[Dict], filter_str: str) -> List[Dict]:
     for item in data:
         processed_query = filter_str
         conditions = re.findall(
-            r"(\w+\s*(?:==|!=|>=|<=|>|<|regex)\s*[^()&| ]+)", filter_str
+            r"(\w+\s*(?:==|!=|>=|<=|>|<|regex|fuzzy)\s*[^()&| ]+)", filter_str
         )
 
         for cond in conditions:
