@@ -712,7 +712,7 @@
             return div.innerHTML;
         }
 
-        function applyFilter() {
+        async function applyFilter() {
             const filterQuery = document.getElementById('filter-input').value.trim();
 
             if (!filterQuery) {
@@ -722,27 +722,18 @@
             }
 
             try {
-                const filterFunc = new Function('data', '_', `
-                    try {
-                        return eval(\`${filterQuery}\`);
-                    } catch(e) {
-                        try {
-                            return eval(\`_.filter(data, ${filterQuery.includes('item') ? filterQuery : `{ ${filterQuery} }`})\`);
-                        } catch(e2) {
-                            return data.filter(item => 
-                                Object.values(item).some(v => JSON.stringify(v).toLowerCase().includes('${filterQuery.toLowerCase()}'))
-                            );
-                        }
-                    }
-                `);
-                filteredData = filterFunc(tableData, _);
+                const res = await fetch(`/api/v1/${activeProject}?filter=${encodeURIComponent(filterQuery)}`);
+                if (res.ok) {
+                    filteredData = await res.json();
+                    renderTable();
+                } else {
+                    filteredData = [...tableData];
+                    renderTable();
+                }
             } catch (e) {
-                filteredData = tableData.filter(item =>
-                    Object.values(item).some(val => JSON.stringify(val).toLowerCase().includes(filterQuery.toLowerCase()))
-                );
+                filteredData = [...tableData];
+                renderTable();
             }
-
-            renderTable();
         }
 
         function openAddModal() {
