@@ -25,7 +25,6 @@
             overflow: hidden;
         }
 
-        /* Layout */
         #toolbar {
             height: 40px;
             padding: 0 20px;
@@ -42,7 +41,6 @@
             overflow: hidden;
         }
 
-        /* Sidebar */
         #sidebar {
             width: 240px;
             background: var(--panel);
@@ -115,16 +113,30 @@
             color: #888;
             font-weight: bold;
             padding: 0 4px;
+            cursor: pointer;
         }
 
         .btn-del:hover {
             color: #ff4444;
         }
 
-        /* Editor & Panel */
+        #content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
         #editor {
             flex: 1;
-            min-width: 0;
+            min-height: 0;
+        }
+
+        #table-view {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
         }
 
         #side-panel {
@@ -133,6 +145,11 @@
             display: flex;
             flex-direction: column;
             border-left: 1px solid var(--border);
+            transition: margin-right 0.3s ease;
+        }
+
+        #side-panel.hidden {
+            margin-right: -380px;
         }
 
         .panel-header {
@@ -144,9 +161,9 @@
             border-bottom: 1px solid var(--border);
         }
 
-        /* UI Elements */
         input,
-        select {
+        select,
+        textarea {
             background: #3c3c3c;
             color: white;
             border: 1px solid var(--border);
@@ -170,16 +187,9 @@
             filter: brightness(1.2);
         }
 
-        #output {
-            margin: 0;
-            padding: 12px;
-            flex: 1;
-            background: #1a1a1a;
-            color: #9cdcfe;
-            font-family: 'Consolas', 'Courier New', monospace;
-            font-size: 12px;
-            overflow: auto;
-            white-space: pre-wrap;
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .status-msg {
@@ -187,31 +197,286 @@
             color: #888;
             margin-left: auto;
         }
+
+        .view-btn {
+            background: #444;
+        }
+
+        .view-btn.active {
+            background: var(--accent);
+        }
+
+        .crud-toolbar {
+            padding: 10px;
+            background: #2d2d2d;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        #data-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        #data-table th {
+            background: #2d2d2d;
+            padding: 8px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: bold;
+            color: #888;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+        }
+
+        #data-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #333;
+            font-size: 12px;
+            vertical-align: top;
+        }
+
+        #data-table tr:hover {
+            background: #2a2d2e;
+        }
+
+        .table-container {
+            flex: 1;
+            overflow: auto;
+        }
+
+        #filter-input {
+            width: 200px;
+        }
+
+        .btn-save {
+            background: #28a745;
+        }
+
+        .btn-cancel {
+            background: #666;
+        }
+
+        .btn-edit {
+            background: #007bff;
+        }
+
+        .btn-delete {
+            background: #dc3545;
+        }
+
+        .btn-add {
+            background: #28a745;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 4px;
+        }
+
+        .action-btns button {
+            padding: 3px 8px;
+            font-size: 11px;
+        }
+
+        #schema-modal,
+        #item-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #schema-modal>div,
+        #item-modal>div {
+            background: var(--panel);
+            padding: 20px;
+            border-radius: 4px;
+            width: 700px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 14px;
+            color: white;
+        }
+
+        .modal-body {
+            flex: 1;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+        }
+
+        .view-toggle {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .view-toggle button {
+            padding: 4px 12px;
+            font-size: 11px;
+        }
+
+        .view-toggle button.active {
+            background: var(--accent);
+        }
+
+        #json-editor-container {
+            flex: 1;
+            min-height: 300px;
+            border: 1px solid var(--border);
+            display: none;
+        }
+
+        #json-editor-container.show {
+            display: block;
+        }
+
+        #form-editor {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #form-editor.show {
+            display: flex;
+        }
+
+        .field-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 5px 0;
+            border-bottom: 1px solid #333;
+        }
+
+        .field-row input {
+            flex: 1;
+            min-width: 100px;
+        }
+
+        .field-row textarea {
+            flex: 2;
+            min-width: 150px;
+            min-height: 36px;
+            resize: vertical;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+        }
+
+        .field-row .btn-remove {
+            background: #dc3545;
+            padding: 4px 8px;
+            font-size: 11px;
+            align-self: center;
+        }
+
+        .add-field-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed var(--border);
+        }
+
+        .add-field-row input {
+            flex: 1;
+        }
+
+        .json-error {
+            color: #ff6b6b;
+            font-size: 11px;
+            padding: 5px;
+            background: rgba(220, 53, 69, 0.2);
+            border-radius: 2px;
+        }
     </style>
 </head>
 
 <body>
     <div id="toolbar">
-        <strong>JSON IDE</strong>
+        <strong>QUICK MOCK API</strong>
         <span id="current-file-label" style="color: #61afef; font-size: 13px; font-family: monospace;"></span>
-        <button onclick="saveFullFile()" id="save-btn" style="background: #28a745;">Save (Ctrl+S)</button>
+        <div style="margin-right: 10px; display: flex; gap: 5px;">
+            <button class="view-btn active" onclick="switchView('editor')" id="editor-btn">Editor</button>
+            <button class="view-btn" onclick="switchView('table')" id="table-btn">Table</button>
+        </div>
+        <button onclick="refreshData()" id="refresh-btn" style="background: #17a2b7;">Refresh</button>
+        <button onclick="saveFullFile()" id="save-btn" style="background: #28a745; display: inline-block;">Save
+            (Ctrl+S)</button>
         <button onclick="openSchemaModal()" id="schema-btn" style="background: #6f42c1;">Set Schema</button>
         <span id="schema-indicator" class="status-msg" style="color: #6f42c1;"></span>
         <span id="status" class="status-msg"></span>
+        <div style="margin-left: auto; display: flex; gap: 5px;">
+            <button onclick="toggleSidePanel()" id="toggle-panel-btn" style="background: #666;">Transform ▶</button>
+        </div>
     </div>
 
-    <div id="schema-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1000; justify-content:center; align-items:center;">
-        <div style="background:var(--panel); padding:20px; border-radius:4px; width:600px; max-height:80vh; display:flex; flex-direction:column; gap:15px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-weight:bold; font-size:14px;">JSON Schema for <span id="schema-resource-name"></span></span>
+    <div id="schema-modal">
+        <div>
+            <div class="modal-header">
+                <h3>JSON Schema for <span id="schema-resource-name"></span></h3>
                 <button onclick="closeSchemaModal()" style="background:#444;">✕</button>
             </div>
-            <div id="schema-editor" style="flex:1; min-height:300px; border:1px solid var(--border);"></div>
-            <div style="display:flex; gap:10px; justify-content:flex-end;">
-                <button onclick="deleteSchema()" id="delete-schema-btn" style="background:#dc3545;">Delete Schema</button>
+            <div id="schema-editor" style="flex:1;min-height:300px;border:1px solid var(--border);"></div>
+            <div class="modal-footer">
+                <button onclick="deleteSchema()" style="background:#dc3545;">Delete Schema</button>
                 <button onclick="saveSchema()" style="background:#28a745;">Save Schema</button>
             </div>
             <div id="schema-status" class="status-msg"></div>
+        </div>
+    </div>
+
+    <div id="item-modal">
+        <div>
+            <div class="modal-header">
+                <h3 id="item-modal-title">Item</h3>
+                <button onclick="closeItemModal()" style="background:#444;">✕</button>
+            </div>
+            <div class="view-toggle">
+                <button id="form-view-btn" class="active" onclick="switchItemView('form')">Form</button>
+                <button id="json-view-btn" onclick="switchItemView('json')">JSON</button>
+            </div>
+            <div class="modal-body">
+                <div id="form-editor" class="show"></div>
+                <div id="json-editor-container"></div>
+                <div id="item-error" class="json-error" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeItemModal()" style="background:#666;">Cancel</button>
+                <button onclick="saveItem()" style="background:#28a745;">Save</button>
+            </div>
         </div>
     </div>
 
@@ -219,21 +484,66 @@
         <div id="sidebar">
             <div id="sidebar-header">Resources</div>
             <div id="new-resource-zone">
-                <input type="text" id="new-proj-input" placeholder="resource_name..." style="width: 100%;">
+                <input type="text" id="new-proj-input" placeholder="resource_name..." style="width:100%;">
                 <button onclick="createNewProject()">+</button>
             </div>
             <div id="resource-list"></div>
         </div>
 
-        <div id="editor"></div>
+        <div id="content-area">
+            <div id="editor"></div>
+
+            <div id="table-view">
+                <div class="crud-toolbar">
+                    <input type="text" id="filter-input" placeholder="Filter: _.filter(data, {status: 'Active'})"
+                        oninput="applyFilter()">
+                    <button onclick="showFilterHelp()" style="background:#666;padding:5px 8px;"
+                        title="Filter Help">?</button>
+                    <button onclick="openAddModal()" style="background:#28a745;">+ Add</button>
+                    <span id="row-count" style="margin-left:auto;font-size:11px;color:#888;"></span>
+                </div>
+
+                <div id="filter-help"
+                    style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--panel);padding:20px;border-radius:4px;z-index:2000;min-width:400px;border:1px solid var(--border);">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:15px;">
+                        <strong style="color:white;">Filter Syntax Help</strong>
+                        <button onclick="document.getElementById('filter-help').style.display='none'"
+                            style="background:#444;padding:2px 8px;">✕</button>
+                    </div>
+                    <div style="font-size:12px;line-height:1.8;color:#ccc;">
+                        <p><strong style="color:#6f42c1;">Lodash:</strong></p>
+                        <code
+                            style="background:#333;padding:2px 4px;border-radius:2px;">_.filter(data, {status: 'Active'})</code><br>
+                        <code
+                            style="background:#333;padding:2px 4px;border-radius:2px;">_.filter(data, {role: 'admin'})</code><br>
+                        <code
+                            style="background:#333;padding:2px 4px;border-radius:2px;">_.filter(data, {active: true})</code>
+                        <p><strong style="color:#6f42c1;">Arrow functions:</strong></p>
+                        <code
+                            style="background:#333;padding:2px 4px;border-radius:2px;">data.filter(i => i.age > 21)</code><br>
+                        <code
+                            style="background:#333;padding:2px 4px;border-radius:2px;">data.filter(i => i.name.startsWith('A'))</code>
+                        <p><strong style="color:#6f42c1;">Simple (text search):</strong></p>
+                        <code style="background:#333;padding:2px 4px;border-radius:2px;">Active</code><br>
+                        <code style="background:#333;padding:2px 4px;border-radius:2px;">admin</code>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="data-table">
+                        <thead id="table-header"></thead>
+                        <tbody id="table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
 
         <div id="side-panel">
             <div class="panel-header">TRANSFORMATION (LODASH SUPPORTED)</div>
-            <div style="padding: 15px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="padding:15px;display:flex;flex-direction:column;gap:10px;">
                 <input type="text" id="query" placeholder="_.filter(data, {status: 'Active'})" oninput="runTransform()">
-                <div style="display: flex; gap: 8px;">
-                    <button onclick="saveQuery()" style="flex: 1; background: #444;">Cache</button>
-                    <select id="queryHistory" onchange="loadQuery(this.value)" style="flex: 2;">
+                <div style="display:flex;gap:8px;">
+                    <button onclick="saveQuery()" style="flex:1;background:#444;">Cache</button>
+                    <select id="queryHistory" onchange="loadQuery(this.value)" style="flex:2;">
                         <option value="">Recent Queries...</option>
                     </select>
                 </div>
@@ -244,12 +554,19 @@
     </div>
 
     <script>
-        let editor;
-        let schemaEditor;
+        let editor, itemEditor, schemaEditor;
         let activeProject = '';
+        let currentView = 'editor';
+        let tableData = [];
+        let filteredData = [];
+        let currentFilter = '';
+        let schemaFields = [];
+        let itemMode = 'add';
+        let editIndex = null;
+        let itemViewMode = 'form';
+        let sidePanelVisible = true;
         const CACHE_KEY = 'json_transform_cache';
 
-        // Initialize Monaco
         require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
         require(['vs/editor/editor.main'], function () {
             editor = monaco.editor.create(document.getElementById('editor'), {
@@ -263,16 +580,12 @@
                 lineNumbersMinChars: 3
             });
 
-            // Set up Ctrl+S shortcut
             editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => saveFullFile());
 
             updateHistoryUI();
             refreshProjectList().then(() => {
-                // Load default or first resource
                 const lastProj = localStorage.getItem('last_active_resource');
-                if (lastProj) {
-                    loadProject(lastProj);
-                }
+                if (lastProj) loadProject(lastProj);
             });
         });
 
@@ -280,9 +593,7 @@
             try {
                 const res = await fetch('/api/v1/resources');
                 const resources = await res.json();
-
-                const list = document.getElementById('resource-list');
-                list.innerHTML = resources.map(p => `
+                document.getElementById('resource-list').innerHTML = resources.map(p => `
                     <div class="resource-item ${p === activeProject ? 'active' : ''}" onclick="loadProject('${p}')">
                         <span>${p}.json</span>
                         <div class="item-actions">
@@ -291,31 +602,26 @@
                         </div>
                     </div>
                 `).join('');
-            } catch (e) {
-                console.error("Failed to fetch resources", e);
-            }
+            } catch (e) { console.error(e); }
         }
 
         async function createNewProject() {
             const name = document.getElementById('new-proj-input').value.trim().replace('.json', '');
             if (!name) return;
-
-            // Create file with empty array
             await fetch(`/api/v1/${name}/bulk/update`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify([])
+                body: '[]'
             });
-
             document.getElementById('new-proj-input').value = '';
             await refreshProjectList();
             loadProject(name);
         }
 
         async function deleteProject(name) {
-            if (!confirm(`Permanently delete ${name}.json?`)) return;
+            if (!confirm(`Delete ${name}.json?`)) return;
             await fetch(`/api/v1/resources/${name}`, { method: 'DELETE' });
-            if (activeProject === name) activeProject = '';
+            if (activeProject === name) { activeProject = ''; tableData = []; filteredData = []; }
             refreshProjectList();
             editor.setValue("[]");
         }
@@ -329,21 +635,359 @@
             const data = await res.json();
 
             editor.setValue(JSON.stringify(data, null, 4));
+            tableData = data || [];
+            filteredData = [...tableData];
+            currentFilter = document.getElementById('filter-input')?.value || '';
+
             refreshProjectList();
             runTransform();
             checkSchema();
+            if (currentView === 'table') renderTable();
         }
 
-        async function checkSchema() {
+        async function refreshData() {
+            if (!activeProject) return;
+            const res = await fetch(`/api/v1/${activeProject}`);
+            const data = await res.json();
+            editor.setValue(JSON.stringify(data, null, 4));
+            tableData = data || [];
+            currentFilter = document.getElementById('filter-input')?.value || '';
+            applyFilter();
+            document.getElementById('status').innerText = "🔄 Refreshed " + new Date().toLocaleTimeString();
+        }
+
+        function switchView(view) {
+            currentView = view;
+            document.getElementById('editor-btn').classList.toggle('active', view === 'editor');
+            document.getElementById('table-btn').classList.toggle('active', view === 'table');
+            document.getElementById('editor').style.display = view === 'editor' ? 'flex' : 'none';
+            document.getElementById('table-view').style.display = view === 'table' ? 'flex' : 'none';
+            document.getElementById('save-btn').style.display = view === 'editor' ? 'inline-block' : 'none';
+            document.getElementById('schema-btn').style.display = view === 'editor' ? 'inline-block' : 'none';
+            if (view === 'table') renderTable();
+        }
+
+        function renderTable() {
+            const dataToShow = currentFilter ? filteredData : tableData;
+
+            if (dataToShow.length === 0) {
+                document.getElementById('table-header').innerHTML = '';
+                document.getElementById('table-body').innerHTML = '<tr><td colspan="100" style="text-align:center;color:#888;padding:20px;">No data</td></tr>';
+                document.getElementById('row-count').innerText = '';
+                return;
+            }
+
+            const allKeys = new Set();
+            dataToShow.forEach(item => Object.keys(item).forEach(k => allKeys.add(k)));
+            const columns = ['id', ...Array.from(allKeys).filter(k => k !== 'id')];
+            schemaFields = columns;
+
+            document.getElementById('table-header').innerHTML = '<tr>' + columns.map(c => `<th>${c}</th>`).join('') + '<th style="width:150px;">Actions</th></tr>';
+
+            document.getElementById('table-body').innerHTML = dataToShow.map((item, idx) => {
+                const originalIdx = tableData.indexOf(item);
+                return '<tr>' + columns.map(col => {
+                    const val = item[col] !== undefined ? JSON.stringify(item[col]) : '';
+                    return `<td><span style="white-space:nowrap;text-overflow:ellipsis;overflow:hidden;display:block;">${escapeHtml(val)}</span></td>`;
+                }).join('') + `<td>
+                    <div class="action-btns">
+                        <button class="btn-edit" onclick="openViewModal(${originalIdx})">View</button>
+                        <button class="btn-edit" onclick="openEditModal(${originalIdx})">Edit</button>
+                        <button class="btn-delete" onclick="deleteRow(${originalIdx})">Del</button>
+                    </div>
+                </td></tr>`;
+            }).join('');
+
+            document.getElementById('row-count').innerText = `${dataToShow.length} rows`;
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function applyFilter() {
+            const filterQuery = document.getElementById('filter-input').value.trim();
+
+            if (!filterQuery) {
+                filteredData = [...tableData];
+                renderTable();
+                return;
+            }
+
             try {
-                const res = await fetch(`/api/v1/${activeProject}/schema`);
-                if (res.ok) {
-                    document.getElementById('schema-indicator').innerText = '✓ Schema';
+                const filterFunc = new Function('data', '_', `
+                    try {
+                        return eval(\`${filterQuery}\`);
+                    } catch(e) {
+                        try {
+                            return eval(\`_.filter(data, ${filterQuery.includes('item') ? filterQuery : `{ ${filterQuery} }`})\`);
+                        } catch(e2) {
+                            return data.filter(item => 
+                                Object.values(item).some(v => JSON.stringify(v).toLowerCase().includes('${filterQuery.toLowerCase()}'))
+                            );
+                        }
+                    }
+                `);
+                filteredData = filterFunc(tableData, _);
+            } catch (e) {
+                filteredData = tableData.filter(item =>
+                    Object.values(item).some(val => JSON.stringify(val).toLowerCase().includes(filterQuery.toLowerCase()))
+                );
+            }
+
+            renderTable();
+        }
+
+        function openAddModal() {
+            itemMode = 'add';
+            editIndex = null;
+            document.getElementById('item-modal-title').innerText = 'Add Item';
+            document.getElementById('item-error').style.display = 'none';
+            document.getElementById('item-error').innerText = '';
+            switchItemView('form');
+            renderFormEditor({});
+            document.getElementById('item-modal').style.display = 'flex';
+        }
+
+        function openViewModal(idx) {
+            itemMode = 'view';
+            editIndex = idx;
+            document.getElementById('item-modal-title').innerText = 'View Item';
+            document.getElementById('item-error').style.display = 'none';
+            switchItemView('form');
+            renderFormEditor({ ...tableData[idx] }, true);
+            document.getElementById('item-modal').style.display = 'flex';
+        }
+
+        function openEditModal(idx) {
+            itemMode = 'edit';
+            editIndex = idx;
+            document.getElementById('item-modal-title').innerText = 'Edit Item';
+            document.getElementById('item-error').style.display = 'none';
+            switchItemView('form');
+            renderFormEditor({ ...tableData[idx] }, false);
+            document.getElementById('item-modal').style.display = 'flex';
+        }
+
+        function closeItemModal() {
+            document.getElementById('item-modal').style.display = 'none';
+            if (itemEditor) itemEditor.setValue('');
+        }
+
+        function switchItemView(view) {
+            itemViewMode = view;
+            document.getElementById('form-view-btn').classList.toggle('active', view === 'form');
+            document.getElementById('json-view-btn').classList.toggle('active', view === 'json');
+            document.getElementById('form-editor').classList.toggle('show', view === 'form');
+            document.getElementById('json-editor-container').classList.toggle('show', view === 'json');
+
+            if (view === 'json') {
+                if (!itemEditor) {
+                    itemEditor = monaco.editor.create(document.getElementById('json-editor-container'), {
+                        value: '{}',
+                        language: 'json',
+                        theme: 'vs-dark',
+                        automaticLayout: true,
+                        fontSize: 12,
+                        minimap: { enabled: false }
+                    });
+                }
+                let data;
+                if (itemMode === 'add') {
+                    data = {};
                 } else {
-                    document.getElementById('schema-indicator').innerText = '';
+                    data = itemMode === 'view' ? { ...tableData[editIndex] } : getFormData();
+                }
+                itemEditor.setValue(JSON.stringify(data, null, 2));
+            } else {
+                const jsonVal = itemEditor?.getValue() || '{}';
+                try {
+                    const data = JSON.parse(jsonVal);
+                    renderFormEditor(data, itemMode === 'view');
+                } catch (e) {
+                    console.log('Parse error:', e);
+                }
+            }
+        }
+
+        function renderFormEditor(data, readonly = false) {
+            const form = document.getElementById('form-editor');
+            const fields = Object.keys(data);
+
+            let html = fields.map(key => {
+                const val = data[key];
+                const valStr = typeof val === 'object' ? JSON.stringify(val, null, 2) : String(val);
+                const isObject = typeof val === 'object';
+                return `
+                    <div class="field-row" data-is-object="${isObject}">
+                        <input type="text" value="${escapeHtml(key)}" placeholder="key" data-field="key" ${readonly ? 'readonly' : ''} style="${readonly ? 'opacity:0.7' : ''}">
+                        <textarea placeholder="value" data-field="value" ${readonly ? 'readonly' : ''} style="flex:2;min-height:40px;resize:vertical;${readonly ? 'opacity:0.7;background:#2d2d2d' : ''}">${escapeHtml(valStr)}</textarea>
+                        ${isObject ? '<span style="color:#f0ad4e;font-size:10px;">obj</span>' : ''}
+                        ${readonly ? '' : `<button class="btn-remove" onclick="removeField(this)">×</button>`}
+                    </div>
+                `;
+            }).join('');
+
+            html += `
+                <div class="add-field-row">
+                    <input type="text" id="new-field-key" placeholder="new field name" ${readonly ? 'style="display:none"' : ''}>
+                    <select id="new-field-type" ${readonly ? 'style="display:none"' : ''}>
+                        <option value="string">String</option>
+                        <option value="number">Number</option>
+                        <option value="boolean">Boolean</option>
+                        <option value="array">Array []</option>
+                        <option value="object">Object {}</option>
+                    </select>
+                    <button onclick="addField()" ${readonly ? 'style="display:none"' : ''}>+ Add Field</button>
+                </div>
+            `;
+
+            form.innerHTML = html;
+        }
+
+        function addField() {
+            const key = document.getElementById('new-field-key').value.trim();
+            const type = document.getElementById('new-field-type')?.value || 'string';
+            if (!key) return;
+
+            let defaultVal = '';
+            let isObject = false;
+            switch (type) {
+                case 'array': defaultVal = '[]'; isObject = true; break;
+                case 'object': defaultVal = '{}'; isObject = true; break;
+                case 'number': defaultVal = '0'; break;
+                case 'boolean': defaultVal = 'true'; break;
+            }
+
+            const newRow = document.createElement('div');
+            newRow.className = 'field-row';
+            newRow.dataset.isObject = isObject;
+            newRow.innerHTML = `
+                <input type="text" value="${escapeHtml(key)}" placeholder="key" data-field="key">
+                <textarea placeholder="value" data-field="value" style="flex:2;min-height:40px;resize:vertical;">${escapeHtml(defaultVal)}</textarea>
+                ${isObject ? '<span style="color:#f0ad4e;font-size:10px;">obj</span>' : ''}
+                <button class="btn-remove" onclick="removeField(this)">×</button>
+            `;
+
+            const addRow = document.querySelector('.add-field-row');
+            addRow.before(newRow);
+            document.getElementById('new-field-key').value = '';
+        }
+
+        function removeField(btn) {
+            btn.closest('.field-row').remove();
+        }
+
+        function getFormData() {
+            const data = {};
+            document.querySelectorAll('#form-editor .field-row').forEach(row => {
+                const keyInput = row.querySelector('[data-field="key"]');
+                const valInput = row.querySelector('[data-field="value"]');
+                if (keyInput && valInput && keyInput.value) {
+                    const key = keyInput.value.trim();
+                    let val = valInput.value;
+                    if (val.trim()) {
+                        try { val = JSON.parse(val); } catch { val = val; }
+                    } else {
+                        val = undefined;
+                    }
+                    if (val !== undefined) data[key] = val;
+                }
+            });
+            return data;
+        }
+
+        function validateItemData(data) {
+            const schemaRes = fetch(`/api/v1/${activeProject}/schema`).then(r => r.ok ? r.json() : null);
+            return schemaRes.then(schema => {
+                if (!schema) return { valid: true };
+                try {
+                    const Ajv = window.ajv || (window.ajv = new Function('return ' + fetch('https://cdn.jsdelivr.net/npm/ajv@8/dist/ajv.bundle.min.js').then(r => r.text()).then(code => eval(code)))());
+                    const validate = new Function('schema', 'data', `return ${code};`)();
+                    if (!validate(data)) {
+                        return { valid: false, error: JSON.stringify(validate.errors, null, 2) };
+                    }
+                } catch { }
+                return { valid: true };
+            });
+        }
+
+        async function saveItem() {
+            let data;
+
+            if (itemViewMode === 'json') {
+                const jsonStr = itemEditor.getValue();
+                try {
+                    data = JSON.parse(jsonStr);
+                } catch (e) {
+                    document.getElementById('item-error').innerText = 'Invalid JSON: ' + e.message;
+                    document.getElementById('item-error').style.display = 'block';
+                    return;
+                }
+            } else {
+                data = getFormData();
+            }
+
+            if (Object.keys(data).length === 0) {
+                document.getElementById('item-error').innerText = 'Item cannot be empty';
+                document.getElementById('item-error').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('item-error').style.display = 'none';
+
+            try {
+                if (itemMode === 'add') {
+                    tableData.push(data);
+                } else if (itemMode === 'edit') {
+                    tableData[editIndex] = data;
+                }
+                await saveTableData();
+                closeItemModal();
+                renderTable();
+            } catch (e) {
+                document.getElementById('item-error').innerText = e.message;
+                document.getElementById('item-error').style.display = 'block';
+            }
+        }
+
+        function deleteRow(idx) {
+            if (!confirm('Delete this row?')) return;
+            tableData.splice(idx, 1);
+            saveTableData();
+            renderTable();
+        }
+
+        async function saveTableData() {
+            document.getElementById('save-btn').innerText = "Saving...";
+            document.getElementById('status').innerText = "";
+
+            try {
+                const res = await fetch(`/api/v1/${activeProject}/bulk/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(tableData)
+                });
+
+                if (res.ok) {
+                    document.getElementById('save-btn').innerText = "Save (Ctrl+S)";
+                    document.getElementById('status').innerText = "✅ Saved " + new Date().toLocaleTimeString();
+                    editor.setValue(JSON.stringify(tableData, null, 4));
+                    filteredData = currentFilter
+                        ? tableData.filter(item => Object.values(item).some(val => JSON.stringify(val).toLowerCase().includes(currentFilter)))
+                        : [...tableData];
+                } else {
+                    const err = await res.json();
+                    document.getElementById('save-btn').innerText = "Save (Ctrl+S)";
+                    document.getElementById('status').innerText = "❌ " + (err.detail || 'Save Failed');
+                    throw new Error(err.detail || 'Save Failed');
                 }
             } catch (e) {
-                document.getElementById('schema-indicator').innerText = '';
+                document.getElementById('save-btn').innerText = "Save (Ctrl+S)";
+                if (e.message) document.getElementById('status').innerText = "❌ " + e.message;
+                throw e;
             }
         }
 
@@ -351,9 +995,8 @@
             if (!activeProject) return;
             const content = editor.getValue();
 
-            try {
-                JSON.parse(content);
-            } catch (e) {
+            try { JSON.parse(content); }
+            catch (e) {
                 document.getElementById('status').innerText = "❌ Invalid JSON";
                 return;
             }
@@ -374,6 +1017,9 @@
                 if (res.ok) {
                     btn.innerText = "Save (Ctrl+S)";
                     status.innerText = "✅ Saved " + new Date().toLocaleTimeString();
+                    tableData = JSON.parse(content);
+                    filteredData = [...tableData];
+                    if (currentView === 'table') renderTable();
                 } else {
                     const err = await res.json();
                     btn.innerText = "Save (Ctrl+S)";
@@ -386,35 +1032,25 @@
         }
 
         function runTransform() {
-            const outputElement = document.getElementById('output');
+            const output = document.getElementById('output');
             try {
-                const query = String(document.getElementById('query').value || "").trim();
+                const query = document.getElementById('query').value.trim();
                 const data = JSON.parse(editor.getValue());
+                if (!query) { output.innerText = JSON.stringify(data, null, 2); return; }
 
-                if (!query) {
-                    outputElement.innerText = JSON.stringify(data, null, 2);
-                    return;
-                }
+                const result = new Function('data', '_', `
+                    try { return eval(\`${query}\`); }
+                    catch (e) { return "Error: " + e.message; }
+                `)(data, _);
 
-                // Injecting Lodash (_) and data into a temporary function
-                const transformFunc = new Function('data', '_', `
-                    try {
-                        return eval(\`${query}\`);
-                    } catch (e) {
-                        return "Logic Error: " + e.message;
-                    }
-                `);
-
-                const result = transformFunc(data, _);
-                outputElement.innerText = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-                outputElement.style.color = "#9cdcfe";
+                output.innerText = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+                output.style.color = "#9cdcfe";
             } catch (e) {
-                outputElement.innerText = "// Syntax Error: " + e.message;
-                outputElement.style.color = "#f44747";
+                output.innerText = "// Error: " + e.message;
+                output.style.color = "#f44747";
             }
         }
 
-        // --- Transformation Cache Logic ---
         function saveQuery() {
             const q = document.getElementById('query').value;
             if (!q) return;
@@ -432,20 +1068,44 @@
 
         function updateHistoryUI() {
             const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '[]');
-            const select = document.getElementById('queryHistory');
-            select.innerHTML = '<option value="">Recent Queries...</option>' +
+            document.getElementById('queryHistory').innerHTML = '<option value="">Recent Queries...</option>' +
                 cache.map(q => `<option value="${q}">${q.substring(0, 40)}${q.length > 40 ? '...' : ''}</option>`).join('');
         }
 
-        async function openSchemaModal() {
+        async function checkSchema() {
+            try {
+                const res = await fetch(`/api/v1/${activeProject}/schema`);
+                document.getElementById('schema-indicator').innerText = res.ok ? '✓ Schema' : '';
+            } catch { document.getElementById('schema-indicator').innerText = ''; }
+        }
+
+        function toggleSidePanel() {
+            sidePanelVisible = !sidePanelVisible;
+            const panel = document.getElementById('side-panel');
+            const btn = document.getElementById('toggle-panel-btn');
+            if (sidePanelVisible) {
+                panel.classList.remove('hidden');
+                btn.innerText = 'Transform ▶';
+            } else {
+                panel.classList.add('hidden');
+                btn.innerText = 'Transform ◀';
+            }
+        }
+
+        function showFilterHelp() {
+            document.getElementById('filter-help').style.display = 'block';
+        }
+
+        function openSchemaModal() {
             if (!activeProject) return;
             document.getElementById('schema-resource-name').innerText = activeProject;
             document.getElementById('schema-modal').style.display = 'flex';
+            document.getElementById('schema-status').innerText = '';
 
             if (!schemaEditor) {
                 require(['vs/editor/editor.main'], function () {
                     schemaEditor = monaco.editor.create(document.getElementById('schema-editor'), {
-                        value: "{\n  \"type\": \"object\",\n  \"properties\": {\n    \n  }\n}",
+                        value: '{\n  "type": "object",\n  "properties": {\n    \n  }\n}',
                         language: 'json',
                         theme: 'vs-dark',
                         automaticLayout: true,
@@ -454,9 +1114,7 @@
                     });
                     loadSchema();
                 });
-            } else {
-                loadSchema();
-            }
+            } else { loadSchema(); }
         }
 
         function closeSchemaModal() {
@@ -469,27 +1127,19 @@
                 if (res.ok) {
                     const schema = await res.json();
                     schemaEditor.setValue(JSON.stringify(schema, null, 4));
-                    document.getElementById('schema-indicator').innerText = '✓ Schema';
                 } else {
-                    schemaEditor.setValue("{\n  \"type\": \"object\",\n  \"properties\": {\n    \n  }\n}");
-                    document.getElementById('schema-indicator').innerText = '';
+                    schemaEditor.setValue('{\n  "type": "object",\n  "properties": {\n    \n  }\n}');
                 }
-            } catch (e) {
-                schemaEditor.setValue("{\n  \"type\": \"object\",\n  \"properties\": {\n    \n  }\n}");
-                document.getElementById('schema-indicator').innerText = '';
+            } catch {
+                schemaEditor.setValue('{\n  "type": "object",\n  "properties": {\n    \n  }\n}');
             }
         }
 
         async function saveSchema() {
             const content = schemaEditor.getValue();
             const status = document.getElementById('schema-status');
-
-            try {
-                JSON.parse(content);
-            } catch (e) {
-                status.innerText = "❌ Invalid JSON";
-                return;
-            }
+            try { JSON.parse(content); }
+            catch (e) { status.innerText = "❌ Invalid JSON"; return; }
 
             try {
                 const res = await fetch(`/api/v1/${activeProject}/schema`, {
@@ -497,35 +1147,26 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: content
                 });
-
                 if (res.ok) {
                     status.innerText = "✅ Schema saved";
                     document.getElementById('schema-indicator').innerText = '✓ Schema';
                 } else {
                     const err = await res.json();
-                    status.innerText = "❌ " + (err.detail || 'Failed to save schema');
+                    status.innerText = "❌ " + (err.detail || 'Failed');
                 }
-            } catch (e) {
-                status.innerText = "❌ Save failed";
-            }
+            } catch { status.innerText = "❌ Save failed"; }
         }
 
         async function deleteSchema() {
-            if (!confirm('Delete schema for this resource?')) return;
-
+            if (!confirm('Delete schema?')) return;
             try {
-                const res = await fetch(`/api/v1/${activeProject}/schema`, {
-                    method: 'DELETE'
-                });
-
+                const res = await fetch(`/api/v1/${activeProject}/schema`, { method: 'DELETE' });
                 if (res.ok) {
                     document.getElementById('schema-status').innerText = "✅ Schema deleted";
                     document.getElementById('schema-indicator').innerText = '';
                     closeSchemaModal();
                 }
-            } catch (e) {
-                document.getElementById('schema-status').innerText = "❌ Delete failed";
-            }
+            } catch { document.getElementById('schema-status').innerText = "❌ Delete failed"; }
         }
     </script>
 </body>
