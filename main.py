@@ -608,7 +608,8 @@ async def get_open_api_endpoint(resource: str):
 @app.get("/api/v1/resources")
 async def list_resources():
     files = glob.glob(os.path.join(DATA_DIR, "*.json"))
-    return [os.path.basename(f).replace(".json", "") for f in files]
+    resources = [os.path.basename(f).replace(".json", "") for f in files]
+    return sorted(resources)
 
 
 @app.delete("/api/v1/resources/{resource}")
