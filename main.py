@@ -351,12 +351,40 @@ def remove_function_file(name: str):
         os.remove(path)
 
 
+class DotDict(dict):
+    def __getattr__(self, key):
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(f"'DotDict' object has no attribute '{key}'")
+
+    def __setattr__(self, key, value):
+        self[key] = value
+
+    def __delattr__(self, key):
+        try:
+            del self[key]
+        except KeyError:
+            raise AttributeError(f"'DotDict' object has no attribute '{key}'")
+
+
+def to_dot_dict(obj):
+    if isinstance(obj, dict):
+        return DotDict({k: to_dot_dict(v) for k, v in obj.items()})
+    elif isinstance(obj, list):
+        return [to_dot_dict(item) for item in obj]
+    return obj
+
+
 def execute_function(func_data: Dict, params: Dict) -> Any:
     body = func_data.get("body", "")
     resources = func_data.get("resources", [])
     available_data = {}
     for res in resources:
-        available_data[res] = get_resource_data(res)
+        data_list = get_resource_data(res)
+        available_data[res] = [to_dot_dict(item) for item in data_list]
+
+    params = to_dot_dict(params)  # type: ignore
 
     logs = []
     try:
@@ -445,6 +473,7 @@ def execute_function(func_data: Dict, params: Dict) -> Any:
             "params": params,
             "result": None,
             **safe_builtins,
+            **available_data,
         }
 
         exec(func_code, func_globals)
@@ -782,7 +811,6 @@ async def test_function(name: str, params: Dict = Body(default={})):
         raise HTTPException(status_code=404, detail="Function not found")
     result = execute_function(func_data, params)
     return result
-
 
 
 # --- SCHEMA ROUTES ---
