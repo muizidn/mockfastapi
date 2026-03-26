@@ -103,6 +103,9 @@ class LoggingMiddleware:
             or scope["path"].startswith("/ws/")
             or scope["path"].startswith("/_next/")
             or scope["path"] == "/api/v1/logs"
+            or scope["path"] == "/logs"
+            or scope["path"] == "/functions"
+            or scope["path"] == "/"
         ):
             await self.app(scope, receive, send)
             return
