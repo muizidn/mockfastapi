@@ -1060,16 +1060,27 @@
                     if (res.ok) {
                         schema = await res.json();
                         schemaCache[activeProject] = schema;
+                        console.log('Schema loaded:', schema);
                     }
-                } catch { }
+                } catch (e) {
+                    console.error('Failed to load schema:', e);
+                }
             }
 
-            if (!schema) return { valid: true };
+            if (!schema) {
+                console.log('No schema found, skipping validation');
+                return { valid: true };
+            }
+            
             try {
-                const Ajv = window.ajv || (window.ajv = new Function('return ' + fetch('https://cdn.jsdelivr.net/npm/ajv@8/dist/ajv.bundle.min.js').then(r => r.text()).then(code => eval(code)))());
-                const validate = new Function('schema', 'data', `return ${code};`)();
+                const AjvCode = await fetch('https://cdn.jsdelivr.net/npm/ajv@8/dist/ajv.bundle.min.js').then(r => r.text());
+                const Ajv = eval(AjvCode);
+                const validator = new Ajv({ allErrors: true });
+                const validate = validator.compile(schema);
+                
                 if (!validate(data)) {
                     const errors = validate.errors;
+                    console.log('Validation errors:', errors);
                     const errorFields = errors.map(e => e.instancePath.replace('/', '') || 'root').filter(Boolean);
                     return { 
                         valid: false, 
@@ -1078,7 +1089,9 @@
                         fields: [...new Set(errorFields)]
                     };
                 }
-            } catch { }
+            } catch (e) {
+                console.error('Validation error:', e);
+            }
             return { valid: true };
         }
 
