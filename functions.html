@@ -301,7 +301,20 @@ result = items</code></pre>
                     <div style="display:flex;gap:10px;margin:15px 0;">
                         <button onclick="runFunction()" class="btn-purple">Run</button>
                     </div>
-                    <div id="test-result">Results will appear here...</div>
+                    <div style="display:flex;gap:15px;flex-wrap:wrap;">
+                        <div style="flex:1;min-width:300px;">
+                            <div style="font-size:11px;color:#888;margin-bottom:5px;">📋 LOGS</div>
+                            <pre id="test-logs" style="background:#1a1a1a;padding:10px;border-radius:4px;min-height:80px;max-height:200px;overflow:auto;font-size:12px;color:#ffd700;margin:0;">No logs yet</pre>
+                        </div>
+                        <div style="flex:1;min-width:300px;">
+                            <div style="font-size:11px;color:#888;margin-bottom:5px;">✅ RESULT</div>
+                            <pre id="test-result" style="background:#1a1a1a;padding:10px;border-radius:4px;min-height:80px;max-height:200px;overflow:auto;font-size:12px;color:#9cdcfe;margin:0;">Results will appear here...</pre>
+                        </div>
+                    </div>
+                    <div id="test-error" style="display:none;margin-top:15px;">
+                        <div style="font-size:11px;color:#ff6b6b;margin-bottom:5px;">❌ ERROR</div>
+                        <pre id="test-error-content" style="background:#2a1a1a;padding:10px;border-radius:4px;font-size:12px;color:#ff6b6b;white-space:pre-wrap;"></pre>
+                    </div>
                 </div>
             </div>
         </div>
@@ -539,6 +552,10 @@ result = items</code></pre>
         async function runFunction() {
             if (!currentFunc) return;
             
+            document.getElementById('test-logs').innerText = 'Running...';
+            document.getElementById('test-result').innerText = 'Running...';
+            document.getElementById('test-error').style.display = 'none';
+            
             const testParams = {};
             params.forEach(p => {
                 const input = document.getElementById(`test-param-${p.name}`);
@@ -551,8 +568,6 @@ result = items</code></pre>
                 }
             });
             
-            document.getElementById('test-result').innerText = 'Running...';
-            
             const res = await fetch(`/api/v1/functions/${currentFunc.name}/run`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -562,27 +577,18 @@ result = items</code></pre>
             const data = await res.json();
             
             if (res.ok) {
-                let output = '';
-                if (data.logs && data.logs.length > 0) {
-                    output += '═══════════════════════════════\n';
-                    output += '  📋 LOGS\n';
-                    output += '═══════════════════════════════\n';
-                    output += data.logs.join('\n');
-                    output += '\n\n';
-                }
-                output += '═══════════════════════════════\n';
-                output += '  ✅ RESULT\n';
-                output += '═══════════════════════════════\n';
-                output += JSON.stringify(data.result, null, 2);
-                document.getElementById('test-result').innerText = output;
-                document.getElementById('test-result').style.color = '#9cdcfe';
+                document.getElementById('test-error').style.display = 'none';
+                document.getElementById('test-logs').innerText = data.logs && data.logs.length > 0 
+                    ? data.logs.join('\n') 
+                    : '(no logs)';
+                document.getElementById('test-result').innerText = JSON.stringify(data.result, null, 2);
             } else {
-                let output = '═══════════════════════════════\n';
-                output += '  ❌ ERROR\n';
-                output += '═══════════════════════════════\n';
-                output += data.detail || 'Unknown error';
-                document.getElementById('test-result').innerText = output;
-                document.getElementById('test-result').style.color = '#ff6b6b';
+                document.getElementById('test-error').style.display = 'block';
+                document.getElementById('test-error-content').innerText = data.detail || 'Unknown error';
+                document.getElementById('test-logs').innerText = data.detail?.includes('Logs:') 
+                    ? data.detail.split('❌ Error:')[0].replace('Logs:\n', '') 
+                    : '(no logs)';
+                document.getElementById('test-result').innerText = '(error occurred)';
             }
         }
     </script>

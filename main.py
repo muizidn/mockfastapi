@@ -203,6 +203,7 @@ def execute_function(func_data: Dict, params: Dict) -> Any:
 
         safe_builtins = {
             "__builtins__": {
+                "__import__": __import__,
                 "print": lambda *args, **kwargs: logs.append(
                     " ".join(str(a) for a in args)
                 ),
