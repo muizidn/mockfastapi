@@ -522,10 +522,13 @@
                 <button id="json-view-btn" onclick="switchItemView('json')">JSON</button>
             </div>
             <div class="modal-body">
+                <div id="error-banner" style="display:none; background: #dc3545; color: white; padding: 15px; margin-bottom: 15px; border-radius: 4px; font-weight: bold;">
+                    <div id="error-banner-text"></div>
+                    <div id="field-errors" style="margin-top: 10px; font-size: 12px;"></div>
+                </div>
                 <div id="form-editor" class="show"></div>
                 <div id="json-editor-container"></div>
                 <div id="item-error" class="json-error" style="display:none; margin-top: 10px;"></div>
-                <div id="field-errors" style="display:none; margin-top: 10px;"></div>
             </div>
             <div class="modal-footer">
                 <button onclick="closeItemModal()" style="background:#666;">Cancel</button>
@@ -1162,16 +1165,19 @@
             document.getElementById('validation-error').style.display = 'inline-block';
             window.lastValidationError = errorMsg;
             
+            document.getElementById('error-banner-text').innerHTML = errorMsg.replace(/\n/g, '<br>');
+            document.getElementById('error-banner').style.display = 'block';
+            
             const fieldErrorsDiv = document.getElementById('field-errors');
             if (window.validationErrors) {
                 const errorsList = window.validationErrors.map(e => {
                     const path = e.instancePath.replace('/', '') || 'root';
-                    return `<div style="color: #ffc107; margin: 5px 0;">
+                    return `<div style="color: #ffc107; margin: 5px 0; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px;">
                         <strong>Field: ${path}</strong><br>
-                        <span style="color: #ccc; font-size: 12px;">${e.message}</span>
+                        <span style="color: #fff; font-size: 12px;">${e.message}</span>
                     </div>`;
                 }).join('');
-                fieldErrorsDiv.innerHTML = '<div style="color: #dc3545; font-weight: bold; margin-bottom: 5px;">Schema Validation Errors:</div>' + errorsList;
+                fieldErrorsDiv.innerHTML = '<div style="color: white; font-weight: bold; margin-bottom: 8px;">Detailed Errors:</div>' + errorsList;
                 fieldErrorsDiv.style.display = 'block';
             }
         }
@@ -1185,6 +1191,7 @@
             document.getElementById('validation-error').style.display = 'none';
             document.getElementById('item-error').style.display = 'none';
             document.getElementById('field-errors').style.display = 'none';
+            document.getElementById('error-banner').style.display = 'none';
             window.validationErrors = null;
             clearRowHighlights();
         }
