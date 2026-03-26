@@ -10,6 +10,7 @@ import glob
 import re
 import operator
 import jsonschema
+from jsonschema import ValidationError
 import aiosqlite
 import asyncio
 import traceback
@@ -92,60 +93,93 @@ async def broadcast_log(log_data: Dict):
 # --- API LOGGER MIDDLEWARE ---
 
 
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    start_time = datetime.now()
+class LoggingMiddleware:
+    def __init__(self, app):
+        self.app = app
 
-    # Skip logging for WebSocket and static files
-    if request.url.path.startswith("/ws/") or request.url.path.startswith("/_next/"):
-        return await call_next(request)
+    async def __call__(self, scope, receive, send):
+        if (
+            scope["type"] != "http"
+            or scope["path"].startswith("/ws/")
+            or scope["path"].startswith("/_next/")
+            or scope["path"] == "/api/v1/logs"
+        ):
+            await self.app(scope, receive, send)
+            return
 
-    body = None
-    if request.method in ["POST", "PUT", "PATCH"]:
-        try:
-            body_bytes = await request.body()
+        start_time = datetime.now()
+        request_body = None
+        body_bytes = b""
+
+        if scope["method"] in ["POST", "PUT", "PATCH"]:
+            while True:
+                message = await receive()
+                if message["type"] == "http.request":
+                    body_bytes += message.get("body", b"")
+                if not message.get("more_body"):
+                    break
+
             if body_bytes:
-                body = body_bytes.decode()
+                request_body = body_bytes.decode("utf-8")
 
-                async def receive():
-                    return {"type": "http.request", "body": body_bytes}
+        status_code = 200
+        response_body = []
 
-                request._receive = receive
-        except:
-            pass
+        async def send_wrapper(message):
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+            elif message["type"] == "http.response.body":
+                if message.get("body"):
+                    response_body.append(message["body"])
+            await send(message)
 
-    response = await call_next(request)
+        async def receive_wrapper():
+            if body_bytes:
+                return {"type": "http.request", "body": body_bytes, "more_body": False}
+            return await receive()
 
-    duration = (datetime.now() - start_time).total_seconds() * 1000
+        try:
+            await self.app(scope, receive_wrapper, send_wrapper)
+        except Exception:
+            raise
 
-    log_data = {
-        "timestamp": datetime.now().isoformat(),
-        "method": request.method,
-        "endpoint": str(request.url.path),
-        "params": json.dumps(dict(request.path_params))
-        if request.path_params
-        else None,
-        "headers": json.dumps(
-            {
-                k: v
-                for k, v in request.headers.items()
-                if k.lower() not in ["authorization", "cookie", "host"]
-            }
-        ),
-        "query_params": json.dumps(dict(request.query_params))
-        if request.query_params
-        else None,
-        "request_body": body[:10000] if body else None,
-        "response_body": None,
-        "status_code": response.status_code,
-        "duration_ms": round(duration, 2),
-        "function_logs": None,
-    }
+        duration = (datetime.now() - start_time).total_seconds() * 1000
 
-    asyncio.create_task(log_api_call(log_data))
-    asyncio.create_task(broadcast_log(log_data))
+        headers = {}
+        for name, value in scope.get("headers", []):
+            name_str = name.decode("utf-8")
+            if name_str not in ["authorization", "cookie", "host"]:
+                headers[name_str] = value.decode("utf-8")
 
-    return response
+        query_string = scope.get("query_string", b"").decode("utf-8")
+        query_params = {}
+        if query_string:
+            for param in query_string.split("&"):
+                if "=" in param:
+                    key, value = param.split("=", 1)
+                    query_params[key] = value
+
+        full_body = b"".join(response_body).decode("utf-8", errors="replace")[:10000]
+
+        log_data = {
+            "timestamp": datetime.now().isoformat(),
+            "method": scope["method"],
+            "endpoint": scope["path"],
+            "params": None,
+            "headers": json.dumps(headers),
+            "query_params": json.dumps(query_params) if query_params else None,
+            "request_body": request_body[:10000] if request_body else None,
+            "response_body": full_body,
+            "status_code": status_code,
+            "duration_ms": round(duration, 2),
+            "function_logs": None,
+        }
+
+        try:
+            await log_api_call(log_data)
+        except Exception as e:
+            print(f"Log error: {e}")
 
 
 # --- FILTER ENGINE ---
@@ -531,6 +565,8 @@ def generate_openapi_spec(resource: str):
 
 # --- ROUTES ---
 
+app.add_middleware(LoggingMiddleware)
+
 
 @app.on_event("startup")
 async def startup():
@@ -564,6 +600,76 @@ async def delete_resource_file(resource: str):
     if os.path.exists(schema_path):
         os.remove(schema_path)
     return {"message": "Resource Deleted"}
+
+
+# --- API LOG ROUTES (must be before CRUD routes) ---
+
+
+@app.get("/api/v1/logs")
+async def get_logs(
+    limit: int = Query(default=100, le=1000),
+    offset: int = Query(default=0, ge=0),
+    method: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    status_code: Optional[int] = None,
+    sort_by: str = Query(default="timestamp"),
+    sort_order: str = Query(default="desc"),
+):
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        query = "SELECT * FROM api_logs WHERE 1=1"
+        params = []
+
+        if method:
+            query += " AND method = ?"
+            params.append(method)
+        if endpoint:
+            query += " AND endpoint LIKE ?"
+            params.append(f"%{endpoint}%")
+        if status_code:
+            query += " AND status_code = ?"
+            params.append(status_code)
+
+        order_map = {
+            "timestamp": "timestamp",
+            "method": "method",
+            "endpoint": "endpoint",
+            "status_code": "status_code",
+            "duration_ms": "duration_ms",
+        }
+        order = order_map.get(sort_by, "timestamp")
+        order_dir = "DESC" if sort_order == "desc" else "ASC"
+        query += f" ORDER BY {order} {order_dir}"
+
+        query += " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        cursor = await db.execute(query, params)
+        rows = await cursor.fetchall()
+
+        cursor = await db.execute(
+            "SELECT COUNT(*) as count FROM api_logs WHERE 1=1"
+            + (f" AND method = '{method}'" if method else "")
+            + (f" AND endpoint LIKE '%{endpoint}%'" if endpoint else "")
+            + (f" AND status_code = {status_code}" if status_code else "")
+        )
+        count_row = await cursor.fetchone()
+        total = count_row[0] if count_row else 0
+
+        return {
+            "logs": [dict(row) for row in rows],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
+
+
+@app.delete("/api/v1/logs")
+async def clear_logs():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM api_logs")
+        await db.commit()
+    return {"status": "ok", "message": "All logs cleared"}
 
 
 # --- CLEAN CRUD ROUTES ---
@@ -784,76 +890,6 @@ async def serve_banner_image(filename: str):
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Image not found")
     return FileResponse(path)
-
-
-# --- API LOG ROUTES ---
-
-
-@app.get("/api/v1/logs")
-async def get_logs(
-    limit: int = Query(default=100, le=1000),
-    offset: int = Query(default=0, ge=0),
-    method: Optional[str] = None,
-    endpoint: Optional[str] = None,
-    status_code: Optional[int] = None,
-    sort_by: str = Query(default="timestamp"),
-    sort_order: str = Query(default="desc"),
-):
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        query = "SELECT * FROM api_logs WHERE 1=1"
-        params = []
-
-        if method:
-            query += " AND method = ?"
-            params.append(method)
-        if endpoint:
-            query += " AND endpoint LIKE ?"
-            params.append(f"%{endpoint}%")
-        if status_code:
-            query += " AND status_code = ?"
-            params.append(status_code)
-
-        order_map = {
-            "timestamp": "timestamp",
-            "method": "method",
-            "endpoint": "endpoint",
-            "status_code": "status_code",
-            "duration_ms": "duration_ms",
-        }
-        order = order_map.get(sort_by, "timestamp")
-        order_dir = "DESC" if sort_order == "desc" else "ASC"
-        query += f" ORDER BY {order} {order_dir}"
-
-        query += " LIMIT ? OFFSET ?"
-        params.extend([limit, offset])
-
-        cursor = await db.execute(query, params)
-        rows = await cursor.fetchall()
-
-        cursor = await db.execute(
-            "SELECT COUNT(*) as count FROM api_logs WHERE 1=1"
-            + (f" AND method = '{method}'" if method else "")
-            + (f" AND endpoint LIKE '%{endpoint}%'" if endpoint else "")
-            + (f" AND status_code = {status_code}" if status_code else "")
-        )
-        count_row = await cursor.fetchone()
-        total = count_row[0] if count_row else 0
-
-        return {
-            "logs": [dict(row) for row in rows],
-            "total": total,
-            "limit": limit,
-            "offset": offset,
-        }
-
-
-@app.delete("/api/v1/logs")
-async def clear_logs():
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("DELETE FROM api_logs")
-        await db.commit()
-    return {"status": "ok", "message": "All logs cleared"}
 
 
 # --- WEBSOCKET ---
