@@ -831,6 +831,32 @@ async def update_item(
     raise HTTPException(status_code=404)
 
 
+@app.patch("/api/v1/r/{resource}/{item_id}")
+async def patch_item(
+    resource: str, item_id: str, patch_data: Dict[str, Any] = Body(...)
+):
+    schema = get_resource_schema(resource)
+    if schema:
+        current_data = get_resource_data(resource)
+        item = next((i for i in current_data if str(i.get("id")) == item_id), None)
+        if not item:
+            raise HTTPException(status_code=404)
+        merged_data = {**item, **patch_data}
+        valid, error = validate_against_schema(merged_data, schema)
+        if not valid:
+            raise HTTPException(
+                status_code=400, detail=f"Schema validation failed: {error}"
+            )
+
+    data = get_resource_data(resource)
+    for i, item in enumerate(data):
+        if str(item.get("id")) == item_id:
+            data[i] = {**item, **patch_data}
+            save_resource_data(resource, data)
+            return data[i]
+    raise HTTPException(status_code=404)
+
+
 @app.delete("/api/v1/r/{resource}/{item_id}")
 async def delete_item(resource: str, item_id: str):
     data = get_resource_data(resource)

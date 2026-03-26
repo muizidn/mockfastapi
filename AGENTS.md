@@ -68,7 +68,8 @@ make up
 - `GET /api/v1/r/{resource}` - List items
 - `POST /api/v1/r/{resource}` - Create item
 - `GET /api/v1/r/{resource}/{item_id}` - Get single item
-- `PUT /api/v1/r/{resource}/{item_id}` - Update item
+- `PATCH /api/v1/r/{resource}/{item_id}` - Partial update item
+- `PUT /api/v1/r/{resource}/{item_id}` - Full update item
 - `DELETE /api/v1/r/{resource}/{item_id}` - Delete item
 - `POST /api/v1/r/{resource}/bulk/update` - Bulk overwrite
 - `GET /api/v1/r/{resource}/schema` - Get schema
