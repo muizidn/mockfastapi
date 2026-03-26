@@ -2,7 +2,7 @@
 <html>
 
 <head>
-    <title>JSON Project IDE</title>
+    <title>Quick API Mock JSON</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
     <style>
@@ -128,7 +128,7 @@
             position: relative;
         }
 
-        #content-area > #empty-state {
+        #content-area>#empty-state {
             position: absolute;
             top: 0;
             left: 0;
@@ -455,7 +455,7 @@
     <div id="toolbar">
         <a href="/functions" style="color: var(--accent); text-decoration: none; font-weight: bold;">⚡ Functions</a>
         <a href="/logs" style="color: var(--accent); text-decoration: none; font-weight: bold;">📋 Logs</a>
-        <strong>QUICK MOCK API</strong>
+        <strong>QUICK API MOCK</strong>
         <span id="current-file-label" style="color: #61afef; font-size: 13px; font-family: monospace;"></span>
         <div style="margin-right: 10px; display: flex; gap: 5px;">
             <button class="view-btn active" onclick="switchView('editor')" id="editor-btn">Editor</button>
@@ -472,14 +472,22 @@
         </div>
     </div>
 
-    <div id="banner-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:2000;justify-content:center;align-items:center;flex-direction:column;">
-        <div id="banner-carousel" style="max-width:800px;max-height:400px;background:var(--panel);border-radius:8px;overflow:hidden;position:relative;">
-            <div id="banner-content" style="display:flex;align-items:center;justify-content:center;height:100%;min-height:300px;"></div>
-            <div id="banner-dots" style="position:absolute;bottom:15px;left:0;right:0;display:flex;justify-content:center;gap:8px;"></div>
-            <button onclick="closeBannerModal()" style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.5);border:none;color:white;padding:8px 12px;border-radius:4px;cursor:pointer;">✕ Close</button>
+    <div id="banner-modal"
+        style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:2000;justify-content:center;align-items:center;flex-direction:column;">
+        <div id="banner-carousel"
+            style="max-width:800px;max-height:400px;background:var(--panel);border-radius:8px;overflow:hidden;position:relative;">
+            <div id="banner-content"
+                style="display:flex;align-items:center;justify-content:center;height:100%;min-height:300px;"></div>
+            <div id="banner-dots"
+                style="position:absolute;bottom:15px;left:0;right:0;display:flex;justify-content:center;gap:8px;"></div>
+            <button onclick="closeBannerModal()"
+                style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.5);border:none;color:white;padding:8px 12px;border-radius:4px;cursor:pointer;">✕
+                Close</button>
         </div>
         <div style="margin-top:15px;text-align:center;">
-            <button onclick="closeBannerModal()" style="background:var(--accent);border:none;color:white;padding:10px 30px;border-radius:4px;cursor:pointer;font-size:14px;">OK, got it!</button>
+            <button onclick="closeBannerModal()"
+                style="background:var(--accent);border:none;color:white;padding:10px 30px;border-radius:4px;cursor:pointer;font-size:14px;">OK,
+                got it!</button>
         </div>
     </div>
 
@@ -528,14 +536,15 @@
                 <button onclick="createNewProject()">+</button>
             </div>
             <div style="padding:8px;">
-                <input type="text" id="resource-search" placeholder="Search resources..." 
-                       style="width:100%;" oninput="filterResources(this.value)">
+                <input type="text" id="resource-search" placeholder="Search resources..." style="width:100%;"
+                    oninput="filterResources(this.value)">
             </div>
             <div id="resource-list"></div>
         </div>
 
         <div id="content-area">
-            <div id="empty-state" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;color:#666;flex-direction:column;">
+            <div id="empty-state"
+                style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;color:#666;flex-direction:column;">
                 <div style="font-size:48px;opacity:0.3;">📋</div>
                 <div style="text-align:center;">
                     <div style="font-size:18px;margin-bottom:10px;">No Resource Selected</div>
@@ -546,7 +555,8 @@
 
             <div id="table-view">
                 <div class="crud-toolbar">
-                    <input type="text" id="filter-input" placeholder="Filter: name fuzzy 'john' or _.filter(data, {status: 'Active'})"
+                    <input type="text" id="filter-input"
+                        placeholder="Filter: name fuzzy 'john' or _.filter(data, {status: 'Active'})"
                         oninput="applyFilter()">
                     <button onclick="showFilterHelp()" style="background:#666;padding:5px 8px;"
                         title="Filter Help">?</button>
@@ -580,7 +590,8 @@
                         <p><strong style="color:#6f42c1;">Field operators:</strong></p>
                         <code style="background:#333;padding:2px 4px;border-radius:2px;">status == Active</code><br>
                         <code style="background:#333;padding:2px 4px;border-radius:2px;">age &gt; 21</code><br>
-                        <code style="background:#333;padding:2px 4px;border-radius:2px;">stock.quantity &gt; 5</code><br>
+                        <code
+                            style="background:#333;padding:2px 4px;border-radius:2px;">stock.quantity &gt; 5</code><br>
                         <code style="background:#333;padding:2px 4px;border-radius:2px;">name fuzzy "john"</code><br>
                         <code style="background:#333;padding:2px 4px;border-radius:2px;">name regex "^ad"</code>
                     </div>
@@ -662,10 +673,10 @@
 
         function filterResources(query) {
             const resources = window.allResources || [];
-            const filtered = query 
+            const filtered = query
                 ? resources.filter(r => r.toLowerCase().includes(query.toLowerCase()))
                 : resources;
-            
+
             document.getElementById('resource-list').innerHTML = filtered.map(p => `
                 <div class="resource-item ${p === activeProject ? 'active' : ''}" onclick="loadProject('${p}')">
                     <span>${p}.json</span>
@@ -694,19 +705,19 @@
             const modal = document.getElementById('banner-modal');
             const content = document.getElementById('banner-content');
             const dots = document.getElementById('banner-dots');
-            
+
             try {
                 const res = await fetch('/api/v1/banners');
                 bannerImages = await res.json();
             } catch {
                 bannerImages = [];
             }
-            
+
             if (bannerImages.length === 0) {
                 content.innerHTML = `
                     <div style="padding:40px;text-align:center;max-width:600px;">
                         <div style="font-size:48px;margin-bottom:20px;">🚀</div>
-                        <h2 style="color:white;margin-bottom:15px;">Welcome to Quick Mock API</h2>
+                        <h2 style="color:white;margin-bottom:15px;">Welcome to Quick API Mock</h2>
                         <p style="color:#aaa;line-height:1.8;">
                             This application is designed to make mocking APIs as fast as possible.<br>
                             You can perform CRUD operations on resources, create custom functions,<br>
@@ -721,7 +732,7 @@
                 modal.style.display = 'flex';
                 return;
             }
-            
+
             showBanner(0);
             modal.style.display = 'flex';
             startBannerSlideshow();
@@ -731,10 +742,10 @@
             currentBannerIndex = index;
             const content = document.getElementById('banner-content');
             const dots = document.getElementById('banner-dots');
-            
+
             content.innerHTML = `<img src="${bannerImages[index]}" alt="Banner ${index + 1}" style="max-width:100%;max-height:400px;">`;
-            
-            dots.innerHTML = bannerImages.map((_, i) => 
+
+            dots.innerHTML = bannerImages.map((_, i) =>
                 `<div class="banner-dot ${i === index ? 'active' : ''}" onclick="showBanner(${i})"></div>`
             ).join('');
         }
@@ -777,10 +788,10 @@
             editor.setValue(JSON.stringify(data, null, 4));
             tableData = data || [];
             filteredData = [...tableData];
-            
+
             document.getElementById('empty-state').style.display = 'none';
             document.getElementById('editor').style.display = currentView === 'editor' ? 'flex' : 'none';
-            
+
             if (currentView === 'table') renderTable();
 
             refreshProjectList();
@@ -789,18 +800,18 @@
 
         async function refreshData() {
             if (!activeProject) return;
-            
+
             const [allRes, filteredRes] = await Promise.all([
                 fetch(`/api/v1/r/${activeProject}`),
                 fetch(`/api/v1/r/${activeProject}${document.getElementById('filter-input').value.trim() ? '?filter=' + encodeURIComponent(document.getElementById('filter-input').value.trim()) : ''}`)
             ]);
-            
+
             const allData = await allRes.json();
             const filtered = await filteredRes.json();
-            
+
             tableData = allData || [];
             filteredData = filtered || [];
-            
+
             editor.setValue(JSON.stringify(tableData, null, 4));
             renderTable();
             document.getElementById('status').innerText = "🔄 Refreshed " + new Date().toLocaleTimeString();
@@ -861,10 +872,10 @@
             const filterQuery = document.getElementById('filter-input').value.trim();
 
             try {
-                const url = filterQuery 
+                const url = filterQuery
                     ? `/api/v1/r/${activeProject}?filter=${encodeURIComponent(filterQuery)}`
                     : `/api/v1/r/${activeProject}`;
-                
+
                 const res = await fetch(url);
                 if (res.ok) {
                     filteredData = await res.json();
@@ -1036,7 +1047,7 @@
 
         async function validateItemData(data) {
             let schema = schemaCache[activeProject];
-            
+
             if (!schema) {
                 try {
                     const res = await fetch(`/api/v1/r/${activeProject}/schema`);
@@ -1046,7 +1057,7 @@
                     }
                 } catch { }
             }
-            
+
             if (!schema) return { valid: true };
             try {
                 const Ajv = window.ajv || (window.ajv = new Function('return ' + fetch('https://cdn.jsdelivr.net/npm/ajv@8/dist/ajv.bundle.min.js').then(r => r.text()).then(code => eval(code)))());
@@ -1118,13 +1129,13 @@
                 if (res.ok) {
                     document.getElementById('save-btn').innerText = "Save (Ctrl+S)";
                     document.getElementById('status').innerText = "✅ Saved " + new Date().toLocaleTimeString();
-                    
+
                     const filterQuery = document.getElementById('filter-input').value.trim();
                     const [allRes, filteredRes] = await Promise.all([
                         fetch(`/api/v1/r/${activeProject}`),
                         filterQuery ? fetch(`/api/v1/r/${activeProject}?filter=${encodeURIComponent(filterQuery)}`) : Promise.resolve({ json: () => [] })
                     ]);
-                    
+
                     tableData = await allRes.json() || [];
                     filteredData = filterQuery ? (await filteredRes.json() || []) : [...tableData];
                     editor.setValue(JSON.stringify(tableData, null, 4));
@@ -1266,7 +1277,7 @@
                     loadSchema();
                 });
             } else { loadSchema(); }
-            
+
             checkSchema();
         }
 

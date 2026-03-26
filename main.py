@@ -17,7 +17,7 @@ import traceback
 from datetime import datetime
 from collections import deque
 
-app = FastAPI(title="JSON Project IDE")
+app = FastAPI(title="Quick API Mock JSON")
 DATA_DIR = "./data"
 SCHEMA_DIR = "./data/schema"
 FUNCTIONS_DIR = "./data/functions"
