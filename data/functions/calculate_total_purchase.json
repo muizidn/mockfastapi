@@ -11,5 +11,5 @@
         "restaurant_booking",
         "product_warehouse"
     ],
-    "body": "# Set result to return value\nprint(\"hello world\")\nimport json\nimport json\nresult = {\n    required\n}"
+    "body": "# Set result to return value\nprint(\"hello world\")\nresult = {\n    params\n}"
 }

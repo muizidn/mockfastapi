@@ -197,10 +197,6 @@ def execute_function(func_data: Dict, params: Dict) -> Any:
     for res in resources:
         available_data[res] = get_resource_data(res)
 
-    import io
-    import sys
-    from contextlib import redirect_stdout
-
     logs = []
     try:
         func_code = compile(body, "<string>", "exec")
@@ -210,6 +206,8 @@ def execute_function(func_data: Dict, params: Dict) -> Any:
                 "print": lambda *args, **kwargs: logs.append(
                     " ".join(str(a) for a in args)
                 ),
+                "set": set,
+                "frozenset": frozenset,
             },
             "True": True,
             "False": False,
@@ -228,7 +226,6 @@ def execute_function(func_data: Dict, params: Dict) -> Any:
             "filter": filter,
             "float": float,
             "format": format,
-            "frozenset": frozenset,
             "hash": hash,
             "hex": hex,
             "int": int,
@@ -258,65 +255,28 @@ def execute_function(func_data: Dict, params: Dict) -> Any:
             "zip": zip,
             "type": type,
             "vars": vars,
-            "open": open,
-            "input": input,
-            "json": __import__("json"),
-            "re": __import__("re"),
-            "datetime": __import__("datetime"),
-            "math": __import__("math"),
-            "random": __import__("random"),
-            "collections": __import__("collections"),
-            "itertools": __import__("itertools"),
-            "functools": __import__("functools"),
-            "uuid": __import__("uuid"),
-            "hashlib": __import__("hashlib"),
-            "base64": __import__("base64"),
-            "urllib": __import__("urllib"),
-            "time": __import__("time"),
-            "calendar": __import__("calendar"),
-            "copy": __import__("copy"),
-            "string": __import__("string"),
-            "textwrap": __import__("textwrap"),
-            "os": __import__("os"),
-            "io": __import__("io"),
         }
 
-        func_globals = {
-            "data": available_data,
-            "params": params,
-            "result": None,
-            **safe_builtins,
-        }
-
-        allowed_imports = [
-            "json",
-            "re",
-            "datetime",
-            "math",
-            "random",
-            "collections",
-            "itertools",
-            "functools",
-            "uuid",
-            "hashlib",
-            "base64",
-            "urllib",
-            "urlparse",
-            "time",
-            "calendar",
-            "copy",
-            "string",
-            "textwrap",
-            "os",
-            "io",
-        ]
-
-        for mod_name in allowed_imports:
-            try:
-                mod = __import__(mod_name)
-                safe_builtins[mod_name] = mod
-            except:
-                pass
+        safe_builtins.update(
+            {
+                "json": __import__("json"),
+                "re": __import__("re"),
+                "datetime": __import__("datetime"),
+                "math": __import__("math"),
+                "random": __import__("random"),
+                "collections": __import__("collections"),
+                "itertools": __import__("itertools"),
+                "functools": __import__("functools"),
+                "uuid": __import__("uuid"),
+                "hashlib": __import__("hashlib"),
+                "base64": __import__("base64"),
+                "time": __import__("time"),
+                "calendar": __import__("calendar"),
+                "copy": __import__("copy"),
+                "string": __import__("string"),
+                "textwrap": __import__("textwrap"),
+            }
+        )
 
         func_globals = {
             "data": available_data,
@@ -330,9 +290,9 @@ def execute_function(func_data: Dict, params: Dict) -> Any:
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Execution error: {str(e)}\nLogs:\n"
+            detail=f"❌ Error: {str(e)}\n\n📋 Logs:\n"
             + "\n".join(logs)
-            + "\n"
+            + "\n\n🔍 Trace:\n"
             + traceback.format_exc(),
         )
 

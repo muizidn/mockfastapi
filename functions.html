@@ -564,13 +564,24 @@ result = items</code></pre>
             if (res.ok) {
                 let output = '';
                 if (data.logs && data.logs.length > 0) {
-                    output += '📋 Logs:\n' + data.logs.join('\n') + '\n\n';
+                    output += '═══════════════════════════════\n';
+                    output += '  📋 LOGS\n';
+                    output += '═══════════════════════════════\n';
+                    output += data.logs.join('\n');
+                    output += '\n\n';
                 }
-                output += '✅ Result:\n' + JSON.stringify(data.result, null, 2);
+                output += '═══════════════════════════════\n';
+                output += '  ✅ RESULT\n';
+                output += '═══════════════════════════════\n';
+                output += JSON.stringify(data.result, null, 2);
                 document.getElementById('test-result').innerText = output;
                 document.getElementById('test-result').style.color = '#9cdcfe';
             } else {
-                document.getElementById('test-result').innerText = data.detail || 'Error';
+                let output = '═══════════════════════════════\n';
+                output += '  ❌ ERROR\n';
+                output += '═══════════════════════════════\n';
+                output += data.detail || 'Unknown error';
+                document.getElementById('test-result').innerText = output;
                 document.getElementById('test-result').style.color = '#ff6b6b';
             }
         }
