@@ -428,29 +428,22 @@
         }
 
         .json-error {
-            color: #ff6b6b;
-            font-size: 11px;
-            padding: 5px;
-            background: rgba(220, 53, 69, 0.2);
-            border-radius: 2px;
+            background: rgba(220, 53, 69, 0.1);
+            color: #dc3545;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-top: 10px;
         }
 
-        #banner-content img {
-            max-width: 100%;
-            max-height: 400px;
-            object-fit: contain;
+        .editor-error-line {
+            background: rgba(220, 53, 69, 0.2) !important;
         }
 
-        .banner-dot {
-            width: 10px;
-            height: 10px;
+        .editor-error-glyph {
+            background: #dc3545;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.4);
-            cursor: pointer;
-        }
-
-        .banner-dot.active {
-            background: white;
+            margin-left: 3px;
         }
     </style>
 </head>
@@ -1137,6 +1130,7 @@
                 window.validationErrors = validation.errors;
                 showValidationError(validation.error, validation.fields);
                 highlightRowWithError(validation);
+                highlightEditorErrors(validation);
                 return;
             }
 
@@ -1184,7 +1178,15 @@
 
         function showValidationErrorDetails() {
             const errorMsg = window.lastValidationError || 'Unknown validation error';
-            alert('Validation Error Details:\n\n' + errorMsg);
+            const errors = window.validationErrors || [];
+            
+            let message = 'Schema Validation Errors:\n\n';
+            errors.forEach((e, i) => {
+                const path = e.instancePath.replace('/', '') || 'root';
+                message += `${i + 1}. Field: ${path}\n   ${e.message}\n\n`;
+            });
+            
+            alert(message);
         }
 
         function clearValidationErrors() {
@@ -1194,6 +1196,7 @@
             document.getElementById('error-banner').style.display = 'none';
             window.validationErrors = null;
             clearRowHighlights();
+            clearEditorErrors();
         }
 
         function highlightRowWithError(validation) {
@@ -1211,6 +1214,51 @@
                 row.style.background = '';
                 row.style.border = '';
             });
+        }
+
+        function clearEditorErrors() {
+            if (itemEditor) {
+                itemEditor.deltaDecorations(itemEditor.getModel().getAllDecorations().map(d => d.id), []);
+            }
+        }
+
+        function highlightEditorErrors(validation) {
+            if (!validation || !validation.errors || !itemEditor) return;
+            
+            const decorations = [];
+            const editorModel = itemEditor.getModel();
+            if (!editorModel) return;
+            
+            const jsonContent = editorModel.getValue();
+            
+            validation.errors.forEach(error => {
+                const path = error.instancePath.replace('/', '').split('/').pop() || '';
+                
+                const lines = jsonContent.split('\n');
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    const fieldMatch = line.match(new RegExp(`"${path}"\\s*:`));
+                    if (fieldMatch) {
+                        const startPos = editorModel.getPositionAt(
+                            jsonContent.split('\n').slice(0, i).join('\n').length + line.indexOf(`"${path}"`)
+                        );
+                        decorations.push({
+                            range: new monaco.Range(i + 1, 1, i + 1, line.length + 1),
+                            options: {
+                                isWholeLine: true,
+                                className: 'editor-error-line',
+                                glyphMarginClassName: 'editor-error-glyph',
+                                glyphMarginHoverMessage: { value: error.message }
+                            }
+                        });
+                        break;
+                    }
+                }
+            });
+            
+            if (decorations.length > 0) {
+                itemEditor.deltaDecorations([], decorations);
+            }
         }
 
         function deleteRow(idx) {
