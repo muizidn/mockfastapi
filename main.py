@@ -23,8 +23,7 @@ if not os.path.exists(SCHEMA_DIR):
 # --- FILTER ENGINE ---
 
 
-def fuzzy_match(text: str, pattern: str, threshold: float = 0.3) -> bool:
-    """Simple fuzzy matching - checks if pattern is subsequence of text"""
+def fuzzy_match(text: str, pattern: str) -> bool:
     text = str(text).lower()
     pattern = pattern.lower()
     pattern_idx = 0
@@ -38,16 +37,29 @@ def fuzzy_match(text: str, pattern: str, threshold: float = 0.3) -> bool:
     return False
 
 
+def get_nested_value(item: Dict, field: str) -> Any:
+    keys = field.split(".")
+    val = item
+    for key in keys:
+        if isinstance(val, dict):
+            val = val.get(key)
+        else:
+            return None
+        if val is None:
+            return None
+    return val
+
+
 def evaluate_condition(item: Dict, condition: str) -> bool:
     try:
         match = re.match(
-            r"(\w+)\s*(==|!=|>=|<=|>|<|regex|fuzzy)\s*(.+)", condition.strip()
+            r"([\w.]+)\s*(==|!=|>=|<=|>|<|regex|fuzzy)\s*(.+)", condition.strip()
         )
         if not match:
             return False
 
         field, op_str, raw_val = match.groups()
-        item_val = item.get(field)
+        item_val = get_nested_value(item, field)
 
         if item_val is None:
             return False
@@ -89,7 +101,7 @@ def apply_complex_filter(data: List[Dict], filter_str: str) -> List[Dict]:
     for item in data:
         processed_query = filter_str
         conditions = re.findall(
-            r"(\w+\s*(?:==|!=|>=|<=|>|<|regex|fuzzy)\s*[^()&| ]+)", filter_str
+            r"([\w.]+\s*(?:==|!=|>=|<=|>|<|regex|fuzzy)\s*[^()&| ]+)", filter_str
         )
 
         for cond in conditions:
@@ -176,7 +188,7 @@ def generate_openapi_spec(resource: str):
                         {
                             "name": "filter",
                             "in": "query",
-                            "description": "Regex example: username regex '^admin' AND age > 20",
+                            "description": "Filter examples: status == Active, stock.quantity > 5, name fuzzy 'john'",
                             "schema": {"type": "string"},
                         }
                     ],
