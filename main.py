@@ -61,21 +61,15 @@ def evaluate_condition(item: Dict, condition: str) -> bool:
         )
         if not match:
             return False
-
         field, op_str, raw_val = match.groups()
         item_val = get_nested_value(item, field)
-
         if item_val is None:
             return False
-
         val = raw_val.strip().strip("'").strip('"')
-
         if op_str == "regex":
             return bool(re.search(val, str(item_val), re.IGNORECASE))
-
         if op_str == "fuzzy":
             return fuzzy_match(item_val, val)
-
         try:
             if "." in val:
                 val, item_val = float(val), float(item_val)
@@ -83,7 +77,6 @@ def evaluate_condition(item: Dict, condition: str) -> bool:
                 val, item_val = int(val), int(item_val)
         except ValueError:
             val, item_val = str(val), str(item_val)
-
         ops = {
             "==": operator.eq,
             "!=": operator.ne,
@@ -100,20 +93,16 @@ def evaluate_condition(item: Dict, condition: str) -> bool:
 def apply_complex_filter(data: List[Dict], filter_str: str) -> List[Dict]:
     if not filter_str:
         return data
-
     filtered_results = []
     for item in data:
         processed_query = filter_str
         conditions = re.findall(
             r"([\w.]+\s*(?:==|!=|>=|<=|>|<|regex|fuzzy)\s*[^()&| ]+)", filter_str
         )
-
         for cond in conditions:
             res = evaluate_condition(item, cond)
             processed_query = processed_query.replace(cond, str(res))
-
         processed_query = processed_query.replace("AND", "and").replace("OR", "or")
-
         try:
             if eval(processed_query, {"__builtins__": {}}, {}):
                 filtered_results.append(item)
@@ -175,6 +164,50 @@ def validate_against_schema(data: Any, schema: Dict) -> tuple[bool, Optional[str
         return False, str(e)
 
 
+# --- FUNCTION UTILITIES ---
+
+
+def get_function(name: str) -> Optional[Dict]:
+    path = os.path.join(FUNCTIONS_DIR, f"{name}.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return None
+
+
+def save_function_data(name: str, func_data: Dict):
+    path = os.path.join(FUNCTIONS_DIR, f"{name}.json")
+    with open(path, "w") as f:
+        json.dump(func_data, f, indent=4)
+
+
+def remove_function_file(name: str):
+    path = os.path.join(FUNCTIONS_DIR, f"{name}.json")
+    if os.path.exists(path):
+        os.remove(path)
+
+
+def execute_function(func_data: Dict, params: Dict) -> Any:
+    body = func_data.get("body", "")
+    resources = func_data.get("resources", [])
+    available_data = {}
+    for res in resources:
+        available_data[res] = get_resource_data(res)
+    try:
+        func_code = compile(body, "<string>", "exec")
+        func_globals = {"data": available_data, "params": params, "result": None}
+        exec(func_code, func_globals)
+        return func_globals.get("result")
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Execution error: {str(e)}\n{traceback.format_exc()}",
+        )
+
+
 # --- DYNAMIC OPENAPI GENERATOR ---
 
 
@@ -192,7 +225,7 @@ def generate_openapi_spec(resource: str):
                         {
                             "name": "filter",
                             "in": "query",
-                            "description": "Filter examples: status == Active, stock.quantity > 5, name fuzzy 'john'",
+                            "description": "Filter examples: status == Active, stock.quantity > 5",
                             "schema": {"type": "string"},
                         }
                     ],
@@ -314,6 +347,88 @@ async def delete_resource_file(resource: str):
     return {"message": "Resource Deleted"}
 
 
+# --- FUNCTION ROUTES (before {resource} to avoid conflict) ---
+
+
+@app.get("/api/v1/functions")
+async def list_functions():
+    files = glob.glob(os.path.join(FUNCTIONS_DIR, "*.json"))
+    funcs = []
+    for f in files:
+        name = os.path.basename(f).replace(".json", "")
+        func_data = get_function(name)
+        if func_data:
+            funcs.append(
+                {
+                    "name": name,
+                    "description": func_data.get("description", ""),
+                    "params": func_data.get("params", []),
+                    "resources": func_data.get("resources", []),
+                }
+            )
+    return funcs
+
+
+@app.post("/api/v1/functions")
+async def create_function(func: Dict = Body(...)):
+    name = func.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Function name is required")
+    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name):
+        raise HTTPException(status_code=400, detail="Invalid function name")
+    if get_function(name):
+        raise HTTPException(status_code=400, detail="Function already exists")
+    func_data = {
+        "name": name,
+        "description": func.get("description", ""),
+        "params": func.get("params", []),
+        "resources": func.get("resources", []),
+        "body": func.get("body", ""),
+    }
+    save_function_data(name, func_data)
+    return {"status": "ok", "name": name}
+
+
+@app.get("/api/v1/functions/{name}")
+async def get_function_details(name: str):
+    func_data = get_function(name)
+    if not func_data:
+        raise HTTPException(status_code=404, detail="Function not found")
+    return func_data
+
+
+@app.put("/api/v1/functions/{name}")
+async def update_function(name: str, func: Dict = Body(...)):
+    if not get_function(name):
+        raise HTTPException(status_code=404, detail="Function not found")
+    func_data = {
+        "name": name,
+        "description": func.get("description", ""),
+        "params": func.get("params", []),
+        "resources": func.get("resources", []),
+        "body": func.get("body", ""),
+    }
+    save_function_data(name, func_data)
+    return {"status": "ok"}
+
+
+@app.delete("/api/v1/functions/{name}")
+async def delete_func(name: str):
+    if not get_function(name):
+        raise HTTPException(status_code=404, detail="Function not found")
+    remove_function_file(name)
+    return {"status": "ok"}
+
+
+@app.post("/api/v1/functions/{name}/run")
+async def run_function(name: str, params: Dict = Body(default={})):
+    func_data = get_function(name)
+    if not func_data:
+        raise HTTPException(status_code=404, detail="Function not found")
+    result = execute_function(func_data, params)
+    return {"result": result}
+
+
 # --- CLEAN CRUD ROUTES ---
 
 
@@ -332,7 +447,6 @@ async def create_item(resource: str, item: Dict[str, Any] = Body(...)):
             raise HTTPException(
                 status_code=400, detail=f"Schema validation failed: {error}"
             )
-
     data = get_resource_data(resource)
     data.append(item)
     save_resource_data(resource, data)
@@ -347,7 +461,6 @@ async def bulk_overwrite(resource: str, items: Any = Body(...)):
             valid, error = validate_against_schema(item, schema)
             if not valid:
                 raise HTTPException(status_code=400, detail=f"Item {i}: {error}")
-
     save_resource_data(resource, items)
     return {"status": "ok"}
 
@@ -372,7 +485,6 @@ async def update_item(
             raise HTTPException(
                 status_code=400, detail=f"Schema validation failed: {error}"
             )
-
     data = get_resource_data(resource)
     for i, item in enumerate(data):
         if str(item.get("id")) == item_id:
@@ -409,7 +521,6 @@ async def set_schema(resource: str, schema: Dict = Body(...)):
         jsonschema.Draft7Validator.check_schema(schema)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid schema: {e}")
-
     save_resource_schema(resource, schema)
     return {"status": "ok"}
 
@@ -420,136 +531,7 @@ async def delete_schema(resource: str):
     return {"status": "ok"}
 
 
-# --- FUNCTION ROUTES ---
-
-
-def get_function(name: str) -> Optional[Dict]:
-    path = os.path.join(FUNCTIONS_DIR, f"{name}.json")
-    if not os.path.exists(path):
-        return None
-    try:
-        with open(path, "r") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError):
-        return None
-
-
-def save_function(name: str, func_data: Dict):
-    path = os.path.join(FUNCTIONS_DIR, f"{name}.json")
-    with open(path, "w") as f:
-        json.dump(func_data, f, indent=4)
-
-
-def remove_function_file(name: str):
-    path = os.path.join(FUNCTIONS_DIR, f"{name}.json")
-    if os.path.exists(path):
-        os.remove(path)
-
-
-def execute_function(func_data: Dict, params: Dict) -> Any:
-    body = func_data.get("body", "")
-    resources = func_data.get("resources", [])
-
-    available_data = {}
-    for res in resources:
-        available_data[res] = get_resource_data(res)
-
-    try:
-        func_code = compile(body, "<string>", "exec")
-        func_globals = {
-            "data": available_data,
-            "params": params,
-            "result": None,
-        }
-        exec(func_code, func_globals)
-        return func_globals.get("result")
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Execution error: {str(e)}\n{traceback.format_exc()}",
-        )
-
-
-@app.get("/api/v1/functions")
-async def list_functions():
-    files = glob.glob(os.path.join(FUNCTIONS_DIR, "*.json"))
-    funcs = []
-    for f in files:
-        name = os.path.basename(f).replace(".json", "")
-        func_data = get_function(name)
-        if func_data:
-            funcs.append(
-                {
-                    "name": name,
-                    "description": func_data.get("description", ""),
-                    "params": func_data.get("params", []),
-                    "resources": func_data.get("resources", []),
-                }
-            )
-    return funcs
-
-
-@app.post("/api/v1/functions")
-async def create_function(func: Dict = Body(...)):
-    name = func.get("name", "").strip()
-    if not name:
-        raise HTTPException(status_code=400, detail="Function name is required")
-    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name):
-        raise HTTPException(status_code=400, detail="Invalid function name")
-    if get_function(name):
-        raise HTTPException(status_code=400, detail="Function already exists")
-
-    func_data = {
-        "name": name,
-        "description": func.get("description", ""),
-        "params": func.get("params", []),
-        "resources": func.get("resources", []),
-        "body": func.get("body", ""),
-    }
-    save_function(name, func_data)
-    return {"status": "ok", "name": name}
-
-
-@app.get("/api/v1/functions/{name}")
-async def get_function_details(name: str):
-    func_data = get_function(name)
-    if not func_data:
-        raise HTTPException(status_code=404, detail="Function not found")
-    return func_data
-
-
-@app.put("/api/v1/functions/{name}")
-async def update_function(name: str, func: Dict = Body(...)):
-    if not get_function(name):
-        raise HTTPException(status_code=404, detail="Function not found")
-
-    func_data = {
-        "name": name,
-        "description": func.get("description", ""),
-        "params": func.get("params", []),
-        "resources": func.get("resources", []),
-        "body": func.get("body", ""),
-    }
-    save_function(name, func_data)
-    return {"status": "ok"}
-
-
-@app.delete("/api/v1/functions/{name}")
-async def delete_func(name: str):
-    if not get_function(name):
-        raise HTTPException(status_code=404, detail="Function not found")
-    remove_function_file(name)
-    return {"status": "ok"}
-
-
-@app.post("/api/v1/functions/{name}/run")
-async def run_function(name: str, params: Dict = Body(default={})):
-    func_data = get_function(name)
-    if not func_data:
-        raise HTTPException(status_code=404, detail="Function not found")
-
-    result = execute_function(func_data, params)
-    return {"result": result}
+# --- UI ROUTES ---
 
 
 @app.get("/functions")
