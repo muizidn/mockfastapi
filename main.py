@@ -516,6 +516,23 @@ def generate_openapi_spec(resource: str):
                 },
                 "put": {
                     "tags": [resource],
+                    "summary": "Full Update Item",
+                    "parameters": [
+                        {
+                            "name": "item_id",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string"},
+                        }
+                    ],
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"type": "object"}}}
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+                "patch": {
+                    "tags": [resource],
+                    "summary": "Partial Update Item",
                     "parameters": [
                         {
                             "name": "item_id",
