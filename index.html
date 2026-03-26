@@ -1223,6 +1223,83 @@
                 itemEditor.deltaDecorations(window.editorDecorationIds, []);
                 window.editorDecorationIds = [];
             }
+            if (editor && window.mainEditorDecorationIds) {
+                editor.deltaDecorations(window.mainEditorDecorationIds, []);
+                window.mainEditorDecorationIds = [];
+            }
+        }
+
+        function highlightEditorErrorsFromBackend(errorMsg, content) {
+            const match = errorMsg.match(/Item (\d+): (.+)/);
+            if (!match) return;
+            
+            const itemIndex = parseInt(match[1]);
+            const errorDetail = match[2];
+            
+            try {
+                const data = JSON.parse(content);
+                if (!Array.isArray(data) || !data[itemIndex]) return;
+                
+                const item = data[itemIndex];
+                
+                let errorField = null;
+                if (errorDetail.includes("is a required property")) {
+                    const fieldMatch = errorDetail.match(/'([^']+)' is a required property/);
+                    errorField = fieldMatch ? fieldMatch[1] : null;
+                } else if (errorDetail.includes("should be")) {
+                    const fieldMatch = errorDetail.match(/property '([^']+)'/);
+                    errorField = fieldMatch ? fieldMatch[1] : null;
+                }
+                
+                if (!errorField) return;
+                
+                clearEditorErrors();
+                
+                const lines = content.split('\n');
+                let currentItem = -1;
+                let itemStartLine = -1;
+                
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].trim().startsWith('{') || lines[i].trim() === '[') {
+                        if (lines[i].trim() === '[') {
+                            currentItem = 0;
+                            itemStartLine = i + 1;
+                        } else if (lines[i].trim() === '{') {
+                            currentItem++;
+                            if (currentItem === itemIndex) {
+                                itemStartLine = i;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (itemStartLine === -1) return;
+                
+                const decorations = [];
+                const regex = new RegExp(`"(${errorField})"\\s*:`);
+                
+                for (let i = itemStartLine; i < lines.length && i < itemStartLine + 50; i++) {
+                    if (regex.test(lines[i])) {
+                        decorations.push({
+                            range: new monaco.Range(i + 1, 1, i + 1, lines[i].length + 1),
+                            options: {
+                                isWholeLine: true,
+                                className: 'editor-error-line',
+                                glyphMarginClassName: 'editor-error-glyph',
+                                glyphMarginHoverMessage: { value: errorDetail }
+                            }
+                        });
+                        break;
+                    }
+                }
+                
+                if (decorations.length > 0) {
+                    window.mainEditorDecorationIds = editor.deltaDecorations([], decorations);
+                }
+            } catch (e) {
+                console.error('Error highlighting:', e);
+            }
         }
 
         function highlightEditorErrors(validation, data) {
@@ -1304,10 +1381,12 @@
                     const err = await res.json();
                     document.getElementById('save-btn').innerText = "Save (Ctrl+S)";
                     const errorMsg = err.detail || 'Save Failed';
-                    document.getElementById('status').innerText = "❌ " + errorMsg;
-                    document.getElementById('status').style.cursor = 'pointer';
-                    document.getElementById('status').title = 'Click to see details';
-                    document.getElementById('status').onclick = () => alert('Save Error:\n\n' + errorMsg);
+                    const statusEl = document.getElementById('status');
+                    statusEl.innerText = "❌ " + errorMsg;
+                    statusEl.style.cursor = 'pointer';
+                    statusEl.style.color = '#dc3545';
+                    statusEl.title = 'Click to see details';
+                    statusEl.onclick = function() { alert('Save Error:\n\n' + errorMsg); };
                     window.lastValidationError = errorMsg;
                     throw new Error(errorMsg);
                 }
@@ -1350,7 +1429,13 @@
                 } else {
                     const err = await res.json();
                     btn.innerText = "Save (Ctrl+S)";
-                    status.innerText = "❌ " + (err.detail || 'Save Failed');
+                    const errorMsg = err.detail || 'Save Failed';
+                    status.innerText = "❌ " + errorMsg;
+                    status.style.cursor = 'pointer';
+                    status.style.color = '#dc3545';
+                    status.title = 'Click to see details';
+                    status.onclick = function() { alert('Save Error:\n\n' + errorMsg); };
+                    highlightEditorErrorsFromBackend(errorMsg, content);
                 }
             } catch (e) {
                 btn.innerText = "Save (Ctrl+S)";
