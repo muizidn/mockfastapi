@@ -1110,8 +1110,13 @@
             clearValidationErrors();
 
             const validation = await validateItemData(data);
+            console.log('Validating item:', data);
+            console.log('Validation result:', validation);
+            
             if (!validation.valid) {
-                document.getElementById('item-error').innerText = 'Schema validation failed: ' + validation.fields.join(', ');
+                console.log('Showing validation error UI');
+                const errorMsg = 'Schema validation failed: ' + validation.fields.join(', ');
+                document.getElementById('item-error').innerText = errorMsg;
                 document.getElementById('item-error').style.display = 'block';
                 window.validationErrors = validation.errors;
                 showValidationError(validation.error, validation.fields);
