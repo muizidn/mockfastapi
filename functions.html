@@ -208,28 +208,35 @@ email = params.email</code></pre>
                 </ul>
 
                 <h4 style="color:#6f42c1;margin-top:20px;">📤 Return Value</h4>
-                <p>Set <code style="background:#333;padding:2px 6px;border-radius:3px;">result = your_value</code> to return a value.</p>
+                <p>You can return values using either method:</p>
+                <pre style="background:#1a1a1a;padding:15px;border-radius:4px;overflow-x:auto;"><code># Method 1: Assign to result variable
+result = [u for u in users if u.age > 21]
 
-                <h4 style="color:#6f42c1;margin-top:20px;">📚 Example: Filter Data (Dot Notation)</h4>
+# Method 2: Use return statement
+filtered = [u for u in users if u.age > 21]
+return filtered</code></pre>
+
+                <h4 style="color:#6f42c1;margin-top:20px;">📚 Example: Filter Data</h4>
                 <pre style="background:#1a1a1a;padding:15px;border-radius:4px;overflow-x:auto;"><code># Filter users with age > 21
 adults = [u for u in users if u.age and u.age > 21]
-result = adults
+return adults
 
-# Or access via params
+# Or use result variable
 threshold = params.threshold or 21
-filtered = [u for u in users if u.age and u.age > threshold]</code></pre>
+filtered = [u for u in users if u.age and u.age > threshold]
+result = filtered</code></pre>
 
-                <h4 style="color:#6f42c1;margin-top:20px;">📚 Example: Use Parameters (Dot Notation)</h4>
+                <h4 style="color:#6f42c1;margin-top:20px;">📚 Example: Use Parameters</h4>
                 <pre style="background:#1a1a1a;padding:15px;border-radius:4px;overflow-x:auto;"><code># Calculate total with discount
 total = sum(item.price for item in items)
 discount = params.discount or 0
-result = total * (1 - discount / 100)</code></pre>
+return total * (1 - discount / 100)</code></pre>
 
-                <h4 style="color:#6f42c1;margin-top:20px;">📚 Example: Transform Data (Dot Notation)</h4>
+                <h4 style="color:#6f42c1;margin-top:20px;">📚 Example: Transform Data</h4>
                 <pre style="background:#1a1a1a;padding:15px;border-radius:4px;overflow-x:auto;"><code># Add full name field
 for user in users:
     user.full_name = f"{user.first_name} {user.last_name}"
-result = users
+return users
 
 # Access nested properties
 first_user = users[0]
@@ -255,7 +262,7 @@ import collections
 # Use them in your code
 today = datetime.date.today()
 matches = re.findall(r'\d+', 'abc123def456')
-result = math.sqrt(16)</code></pre>
+return math.sqrt(16)</code></pre>
 
                 <h4 style="color:#6f42c1;margin-top:20px;">📋 Logs</h4>
                 <p>Use <code style="background:#333;padding:2px 6px;border-radius:3px;">print()</code> statements to log debug info. They will appear in the test results.</p>
@@ -263,7 +270,7 @@ result = math.sqrt(16)</code></pre>
 print(f"Found {len(users)} users")
 for user in users:
     print(f"Processing: {user.name}")
-result = users</code></pre>
+return users</code></pre>
             </div>
             <div style="margin-top:20px;text-align:right;">
                 <button onclick="closeHelp()" class="btn-green">Got it!</button>
