@@ -125,6 +125,15 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            position: relative;
+        }
+
+        #content-area > #empty-state {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
         }
 
         #editor {
@@ -491,7 +500,14 @@
         </div>
 
         <div id="content-area">
-            <div id="editor"></div>
+            <div id="empty-state" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;color:#666;flex-direction:column;">
+                <div style="font-size:48px;opacity:0.3;">📋</div>
+                <div style="text-align:center;">
+                    <div style="font-size:18px;margin-bottom:10px;">No Resource Selected</div>
+                    <div style="font-size:13px;">Create a new resource or select one from the sidebar to edit</div>
+                </div>
+            </div>
+            <div id="editor" style="display:none;"></div>
 
             <div id="table-view">
                 <div class="crud-toolbar">
@@ -627,9 +643,15 @@
         async function deleteProject(name) {
             if (!confirm(`Delete ${name}.json?`)) return;
             await fetch(`/api/v1/resources/${name}`, { method: 'DELETE' });
-            if (activeProject === name) { activeProject = ''; tableData = []; filteredData = []; }
+            if (activeProject === name) {
+                activeProject = '';
+                tableData = [];
+                filteredData = [];
+                document.getElementById('empty-state').style.display = 'flex';
+                document.getElementById('editor').style.display = 'none';
+                editor.setValue("[]");
+            }
             refreshProjectList();
-            editor.setValue("[]");
         }
 
         async function loadProject(name) {
@@ -643,6 +665,10 @@
             editor.setValue(JSON.stringify(data, null, 4));
             tableData = data || [];
             filteredData = [...tableData];
+            
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('editor').style.display = currentView === 'editor' ? 'flex' : 'none';
+            
             if (currentView === 'table') renderTable();
 
             refreshProjectList();
