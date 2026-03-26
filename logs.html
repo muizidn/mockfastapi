@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Logs</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+    <style>
+        :root {
+            --bg: #1e1e1e;
+            --panel: #252526;
+            --sidebar: #333333;
+            --accent: #007acc;
+            --border: #444;
+        }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: #cccccc;
+        }
+        #toolbar {
+            height: 50px;
+            padding: 0 20px;
+            background: var(--panel);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+        button:hover { filter: brightness(1.2); }
+        .btn-red { background: #dc3545; }
+        .btn-green { background: #28a745; }
+        input, select {
+            background: #3c3c3c;
+            color: white;
+            border: 1px solid var(--border);
+            padding: 6px 10px;
+            border-radius: 2px;
+        }
+        #main { display: flex; height: calc(100vh - 50px); }
+        #log-list {
+            width: 60%;
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        #log-detail {
+            width: 40%;
+            overflow-y: auto;
+            padding: 15px;
+            background: var(--panel);
+        }
+        .log-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .log-item:hover { background: #2a2d2e; }
+        .log-item.active { background: #37373d; border-left: 3px solid var(--accent); }
+        .method {
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            min-width: 50px;
+            text-align: center;
+        }
+        .method.GET { background: #28a745; }
+        .method.POST { background: #007bff; }
+        .method.PUT { background: #ffc107; color: black; }
+        .method.DELETE { background: #dc3545; }
+        .method.PATCH { background: #6f42c1; }
+        .endpoint { flex: 1; font-family: monospace; font-size: 13px; }
+        .status { font-size: 12px; padding: 2px 6px; border-radius: 3px; }
+        .status.success { background: rgba(40, 167, 69, 0.2); color: #28a745; }
+        .status.error { background: rgba(220, 53, 69, 0.2); color: #dc3545; }
+        .timestamp { font-size: 11px; color: #888; }
+        .duration { font-size: 11px; color: #888; }
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: var(--bg);
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+        .section-title {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        pre {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            margin-right: 5px;
+        }
+        .badge-new { background: #dc3545; animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        #filters {
+            padding: 10px 15px;
+            background: #2d2d2d;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-group { display: flex; gap: 5px; align-items: center; }
+        .filter-group label { font-size: 11px; color: #888; }
+        .empty-state {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+        .realtime-badge {
+            background: #dc3545;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            animation: pulse 1s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <a href="/" style="color: var(--accent); text-decoration: none; font-weight: bold;">← Back</a>
+        <strong>API Logs</strong>
+        <span id="realtime-badge" class="realtime-badge" style="display:none;">LIVE</span>
+        <button onclick="clearLogs()" class="btn-red">Clear All</button>
+        <button onclick="refreshLogs()" style="background:#17a2b7;">Refresh</button>
+        <span id="count" style="margin-left:auto;color:#888;font-size:12px;"></span>
+    </div>
+
+    <div id="filters">
+        <div class="filter-group">
+            <label>Method:</label>
+            <select id="filter-method" onchange="refreshLogs()">
+                <option value="">All</option>
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Endpoint:</label>
+            <input type="text" id="filter-endpoint" placeholder="/api/..." style="width:150px;" onchange="refreshLogs()">
+        </div>
+        <div class="filter-group">
+            <label>Status:</label>
+            <select id="filter-status" onchange="refreshLogs()">
+                <option value="">All</option>
+                <option value="200">200</option>
+                <option value="400">400</option>
+                <option value="404">404</option>
+                <option value="500">500</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Sort:</label>
+            <select id="sort-by" onchange="refreshLogs()">
+                <option value="timestamp">Time</option>
+                <option value="duration_ms">Duration</option>
+            </select>
+            <select id="sort-order" onchange="refreshLogs()">
+                <option value="desc">Desc</option>
+                <option value="asc">Asc</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="main">
+        <div id="log-list">
+            <div id="logs-container"></div>
+        </div>
+        <div id="log-detail">
+            <div class="empty-state">
+                <div style="font-size:48px;margin-bottom:15px;">📋</div>
+                <div>Select a log entry to view details</div>
+            </div>
+            <div id="log-detail-content" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        let logs = [];
+        let ws = null;
+        let selectedLogId = null;
+
+        async function refreshLogs() {
+            const method = document.getElementById('filter-method').value;
+            const endpoint = document.getElementById('filter-endpoint').value;
+            const status = document.getElementById('filter-status').value;
+            const sortBy = document.getElementById('sort-by').value;
+            const sortOrder = document.getElementById('sort-order').value;
+
+            let url = `/api/v1/logs?limit=200&sort_by=${sortBy}&sort_order=${sortOrder}`;
+            if (method) url += `&method=${method}`;
+            if (endpoint) url += `&endpoint=${encodeURIComponent(endpoint)}`;
+            if (status) url += `&status_code=${status}`;
+
+            const res = await fetch(url);
+            const data = await res.json();
+            logs = data.logs || [];
+            renderLogs();
+            document.getElementById('count').innerText = `${data.total} logs`;
+        }
+
+        function renderLogs() {
+            const container = document.getElementById('logs-container');
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="empty-state">No logs found</div>';
+                return;
+            }
+
+            container.innerHTML = logs.map(log => {
+                const statusClass = log.status_code >= 200 && log.status_code < 300 ? 'success' : 'error';
+                const isNew = log.is_new;
+                return `
+                    <div class="log-item ${log.id === selectedLogId ? 'active' : ''}" onclick="selectLog(${log.id})">
+                        <span class="method ${log.method}">${log.method}</span>
+                        <span class="endpoint">${log.endpoint}</span>
+                        <span class="status ${statusClass}">${log.status_code}</span>
+                        <span class="duration">${log.duration_ms?.toFixed(0) || 0}ms</span>
+                        ${isNew ? '<span class="badge badge-new">NEW</span>' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectLog(id) {
+            selectedLogId = id;
+            const log = logs.find(l => l.id === id);
+            if (!log) return;
+
+            document.querySelectorAll('.log-item').forEach(el => el.classList.remove('active'));
+            event.target.closest('.log-item')?.classList.add('active');
+
+            document.getElementById('log-detail-content').style.display = 'block';
+            document.getElementById('log-detail-content').innerHTML = `
+                <div style="margin-bottom:15px;">
+                    <span class="method ${log.method}">${log.method}</span>
+                    <strong style="font-size:16px;margin-left:10px;">${log.endpoint}</span></strong>
+                </div>
+                <div style="margin-bottom:15px;color:#888;font-size:12px;">
+                    ${log.timestamp} • ${log.duration_ms?.toFixed(2) || 0}ms • Status: ${log.status_code}
+                </div>
+
+                <div class="section">
+                    <div class="section-title">📝 Query Params</div>
+                    <pre>${log.query_params ? JSON.stringify(JSON.parse(log.query_params), null, 2) : '(none)'}</pre>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">📤 Request Body</div>
+                    <pre>${log.request_body || '(none)'}</pre>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">📥 Response Body</div>
+                    <pre>${formatJson(log.response_body)}</pre>
+                </div>
+
+                ${log.function_logs ? `
+                <div class="section">
+                    <div class="section-title">📋 Function Logs</div>
+                    <pre style="color:#ffd700;">${log.function_logs}</pre>
+                </div>
+                ` : ''}
+
+                <div class="section">
+                    <div class="section-title">🔧 Params</div>
+                    <pre>${log.params || '(none)'}</pre>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">📨 Headers</div>
+                    <pre>${log.headers ? JSON.stringify(JSON.parse(log.headers), null, 2) : '(none)'}</pre>
+                </div>
+            `;
+        }
+
+        function formatJson(str) {
+            try {
+                return JSON.stringify(JSON.parse(str), null, 2);
+            } catch {
+                return str || '(none)';
+            }
+        }
+
+        async function clearLogs() {
+            if (!confirm('Clear all logs?')) return;
+            await fetch('/api/v1/logs', { method: 'DELETE' });
+            refreshLogs();
+        }
+
+        function connectWebSocket() {
+            ws = new WebSocket(`ws://${window.location.host}/ws/logs`);
+            
+            ws.onopen = () => {
+                document.getElementById('realtime-badge').style.display = 'inline';
+                console.log('WebSocket connected');
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const log = JSON.parse(event.data);
+                    log.is_new = true;
+                    logs.unshift(log);
+                    if (logs.length > 200) logs.pop();
+                    renderLogs();
+                    document.getElementById('count').innerText = `${logs.length} logs (live)`;
+                } catch (e) {
+                    console.error('WS parse error:', e);
+                }
+            };
+            
+            ws.onclose = () => {
+                document.getElementById('realtime-badge').style.display = 'none';
+                setTimeout(connectWebSocket, 3000);
+            };
+            
+            ws.onerror = (err) => {
+                console.error('WebSocket error:', err);
+                ws.close();
+            };
+        }
+
+        refreshLogs();
+        connectWebSocket();
+    </script>
+</body>
+</html>

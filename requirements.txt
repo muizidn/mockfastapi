@@ -1,3 +1,5 @@
 fastapi
 uvicorn
 jsonschema
+aiosqlite
+websockets

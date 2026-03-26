@@ -15,6 +15,7 @@ RUN uv pip install --system -r requirements.txt
 COPY main.py .
 COPY index.html .
 COPY functions.html .
+COPY logs.html .
 
 # Create the data and schema directories (it will be overridden by the volume,
 # but this ensures correct permissions)

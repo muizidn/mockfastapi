@@ -1,21 +1,26 @@
-from fastapi import FastAPI, HTTPException, Body, Path, Query
+from fastapi import FastAPI, HTTPException, Body, Path, Query, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.openapi.docs import get_swagger_ui_html
 from typing import List, Dict, Any, Optional
+from starlette.responses import Response
 import json
 import os
 import glob
 import re
 import operator
 import jsonschema
-from jsonschema import ValidationError
+import aiosqlite
+import asyncio
 import traceback
+from datetime import datetime
+from collections import deque
 
 app = FastAPI(title="JSON Project IDE")
 DATA_DIR = "./data"
 SCHEMA_DIR = "./data/schema"
 FUNCTIONS_DIR = "./data/functions"
+DB_PATH = "./data/api_logs.db"
 
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
@@ -23,6 +28,134 @@ if not os.path.exists(SCHEMA_DIR):
     os.makedirs(SCHEMA_DIR)
 if not os.path.exists(FUNCTIONS_DIR):
     os.makedirs(FUNCTIONS_DIR)
+
+# WebSocket clients for real-time updates
+ws_clients = set()
+
+# --- DATABASE SETUP ---
+
+
+async def init_db():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS api_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                method TEXT NOT NULL,
+                endpoint TEXT NOT NULL,
+                params TEXT,
+                headers TEXT,
+                query_params TEXT,
+                request_body TEXT,
+                response_body TEXT,
+                status_code INTEGER,
+                duration_ms REAL,
+                function_logs TEXT
+            )
+        """)
+        await db.commit()
+
+
+async def log_api_call(log_data: Dict):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO api_logs (timestamp, method, endpoint, params, headers, query_params, request_body, response_body, status_code, duration_ms, function_logs)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                log_data.get("timestamp"),
+                log_data.get("method"),
+                log_data.get("endpoint"),
+                log_data.get("params"),
+                log_data.get("headers"),
+                log_data.get("query_params"),
+                log_data.get("request_body"),
+                log_data.get("response_body"),
+                log_data.get("status_code"),
+                log_data.get("duration_ms"),
+                log_data.get("function_logs"),
+            ),
+        )
+        await db.commit()
+        return log_data
+
+
+async def broadcast_log(log_data: Dict):
+    for client in ws_clients.copy():
+        try:
+            await client.send_json(log_data)
+        except:
+            ws_clients.discard(client)
+
+
+# --- API LOGGER MIDDLEWARE ---
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = datetime.now()
+
+    body = None
+    if request.method in ["POST", "PUT", "PATCH"]:
+        try:
+            body_bytes = await request.body()
+            if body_bytes:
+                body = body_bytes.decode()
+
+                async def receive():
+                    return {"type": "http.request", "body": body_bytes}
+
+                request._receive = receive
+        except:
+            pass
+
+    response = await call_next(request)
+
+    duration = (datetime.now() - start_time).total_seconds() * 1000
+
+    try:
+        response_body = b""
+        async for chunk in response.body_iterator:
+            response_body += chunk
+        response_body = response_body.decode() if response_body else ""
+
+        log_data = {
+            "timestamp": datetime.now().isoformat(),
+            "method": request.method,
+            "endpoint": str(request.url.path),
+            "params": json.dumps(dict(request.path_params))
+            if request.path_params
+            else None,
+            "headers": json.dumps(
+                {
+                    k: v
+                    for k, v in request.headers.items()
+                    if k.lower() not in ["authorization", "cookie"]
+                }
+            ),
+            "query_params": json.dumps(dict(request.query_params))
+            if request.query_params
+            else None,
+            "request_body": body[:10000] if body else None,
+            "response_body": response_body[:10000] if response_body else None,
+            "status_code": response.status_code,
+            "duration_ms": round(duration, 2),
+            "function_logs": None,
+        }
+
+        asyncio.create_task(log_api_call(log_data))
+        asyncio.create_task(broadcast_log(log_data))
+
+        return Response(
+            content=response_body,
+            status_code=response.status_code,
+            headers=dict(response.headers),
+            media_type=response.media_type,
+        )
+    except Exception as e:
+        return response
+
 
 # --- FILTER ENGINE ---
 
@@ -408,6 +541,11 @@ def generate_openapi_spec(resource: str):
 # --- ROUTES ---
 
 
+@app.on_event("startup")
+async def startup():
+    await init_db()
+
+
 @app.get("/docs/{resource}", include_in_schema=False)
 async def get_resource_docs(resource: str):
     return get_swagger_ui_html(
@@ -437,7 +575,7 @@ async def delete_resource_file(resource: str):
     return {"message": "Resource Deleted"}
 
 
-# --- FUNCTION ROUTES (before {resource} to avoid conflict) ---
+# --- FUNCTION ROUTES ---
 
 
 @app.get("/api/v1/functions")
@@ -549,114 +687,94 @@ async def get_banners():
 
 @app.get("/banner-images/{filename}")
 async def serve_banner_image(filename: str):
-    from fastapi.responses import FileResponse
-
     path = os.path.join(BANNER_DIR, filename)
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Image not found")
     return FileResponse(path)
 
 
-# --- CLEAN CRUD ROUTES ---
+# --- API LOG ROUTES ---
 
 
-@app.get("/api/v1/{resource}")
-async def read_all(resource: str, filter: Optional[str] = Query(None)):
-    data = get_resource_data(resource)
-    return apply_complex_filter(data, filter) if filter else data
-
-
-@app.post("/api/v1/{resource}")
-async def create_item(resource: str, item: Dict[str, Any] = Body(...)):
-    schema = get_resource_schema(resource)
-    if schema:
-        valid, error = validate_against_schema(item, schema)
-        if not valid:
-            raise HTTPException(
-                status_code=400, detail=f"Schema validation failed: {error}"
-            )
-    data = get_resource_data(resource)
-    data.append(item)
-    save_resource_data(resource, data)
-    return {"status": "ok"}
-
-
-@app.post("/api/v1/{resource}/bulk/update")
-async def bulk_overwrite(resource: str, items: Any = Body(...)):
-    schema = get_resource_schema(resource)
-    if schema:
-        for i, item in enumerate(items):
-            valid, error = validate_against_schema(item, schema)
-            if not valid:
-                raise HTTPException(status_code=400, detail=f"Item {i}: {error}")
-    save_resource_data(resource, items)
-    return {"status": "ok"}
-
-
-@app.get("/api/v1/{resource}/{item_id}")
-async def read_one(resource: str, item_id: str):
-    data = get_resource_data(resource)
-    item = next((i for i in data if str(i.get("id")) == item_id), None)
-    if not item:
-        raise HTTPException(status_code=404)
-    return item
-
-
-@app.put("/api/v1/{resource}/{item_id}")
-async def update_item(
-    resource: str, item_id: str, updated_item: Dict[str, Any] = Body(...)
+@app.get("/api/v1/logs")
+async def get_logs(
+    limit: int = Query(default=100, le=1000),
+    offset: int = Query(default=0, ge=0),
+    method: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    status_code: Optional[int] = None,
+    sort_by: str = Query(default="timestamp"),
+    sort_order: str = Query(default="desc"),
 ):
-    schema = get_resource_schema(resource)
-    if schema:
-        valid, error = validate_against_schema(updated_item, schema)
-        if not valid:
-            raise HTTPException(
-                status_code=400, detail=f"Schema validation failed: {error}"
-            )
-    data = get_resource_data(resource)
-    for i, item in enumerate(data):
-        if str(item.get("id")) == item_id:
-            data[i] = updated_item
-            save_resource_data(resource, data)
-            return updated_item
-    raise HTTPException(status_code=404)
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        query = "SELECT * FROM api_logs WHERE 1=1"
+        params = []
 
+        if method:
+            query += " AND method = ?"
+            params.append(method)
+        if endpoint:
+            query += " AND endpoint LIKE ?"
+            params.append(f"%{endpoint}%")
+        if status_code:
+            query += " AND status_code = ?"
+            params.append(status_code)
 
-@app.delete("/api/v1/{resource}/{item_id}")
-async def delete_item(resource: str, item_id: str):
-    data = get_resource_data(resource)
-    new_data = [item for item in data if str(item.get("id")) != item_id]
-    save_resource_data(resource, new_data)
-    return {"message": "Deleted"}
+        order_map = {
+            "timestamp": "timestamp",
+            "method": "method",
+            "endpoint": "endpoint",
+            "status_code": "status_code",
+            "duration_ms": "duration_ms",
+        }
+        order = order_map.get(sort_by, "timestamp")
+        order_dir = "DESC" if sort_order == "desc" else "ASC"
+        query += f" ORDER BY {order} {order_dir}"
 
+        query += " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
 
-# --- SCHEMA ROUTES ---
+        cursor = await db.execute(query, params)
+        rows = await cursor.fetchall()
 
-
-@app.get("/api/v1/{resource}/schema")
-async def get_schema(resource: str):
-    schema = get_resource_schema(resource)
-    if schema is None:
-        raise HTTPException(
-            status_code=404, detail="No schema defined for this resource"
+        cursor = await db.execute(
+            "SELECT COUNT(*) as count FROM api_logs WHERE 1=1"
+            + (f" AND method = '{method}'" if method else "")
+            + (f" AND endpoint LIKE '%{endpoint}%'" if endpoint else "")
+            + (f" AND status_code = {status_code}" if status_code else "")
         )
-    return schema
+        count_row = await cursor.fetchone()
+        total = count_row[0] if count_row else 0
+
+        return {
+            "logs": [dict(row) for row in rows],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
 
 
-@app.put("/api/v1/{resource}/schema")
-async def set_schema(resource: str, schema: Dict = Body(...)):
+@app.delete("/api/v1/logs")
+async def clear_logs():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM api_logs")
+        await db.commit()
+    return {"status": "ok", "message": "All logs cleared"}
+
+
+# --- WEBSOCKET ---
+
+
+@app.websocket("/ws/logs")
+async def websocket_logs(websocket):
+    await websocket.accept()
+    ws_clients.add(websocket)
     try:
-        jsonschema.Draft7Validator.check_schema(schema)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid schema: {e}")
-    save_resource_schema(resource, schema)
-    return {"status": "ok"}
-
-
-@app.delete("/api/v1/{resource}/schema")
-async def delete_schema(resource: str):
-    delete_resource_schema(resource)
-    return {"status": "ok"}
+        while True:
+            data = await websocket.receive_text()
+    except Exception:
+        ws_clients.discard(websocket)
 
 
 # --- UI ROUTES ---
@@ -665,6 +783,11 @@ async def delete_schema(resource: str):
 @app.get("/functions")
 async def functions_ui():
     return FileResponse("functions.html")
+
+
+@app.get("/logs")
+async def logs_ui():
+    return FileResponse("logs.html")
 
 
 @app.get("/")

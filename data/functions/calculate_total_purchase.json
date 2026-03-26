@@ -11,5 +11,5 @@
         "restaurant_booking",
         "product_warehouse"
     ],
-    "body": "print(\"hello world\")\nresult = {\n}"
+    "body": "import os\n\nprint(os.listdir(\"/\"))\nprint(os.listdir(\"/proc\"))"
 }
