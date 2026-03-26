@@ -184,40 +184,57 @@
     </div>
 
     <div id="help-modal">
-        <div style="background:var(--panel);padding:20px;border-radius:4px;width:700px;max-height:80vh;overflow:auto;">
+        <div style="background:var(--panel);padding:20px;border-radius:4px;width:800px;max-height:80vh;overflow:auto;">
             <div class="modal-header">
                 <h3>Function Writing Guide</h3>
                 <button onclick="closeHelp()" style="background:#444;">✕</button>
             </div>
             <div style="font-size:13px;line-height:1.8;color:#ccc;">
+                <h4 style="color:#28a745;margin-top:20px;">✨ Dot Notation Access (NEW!)</h4>
+                <p>You can now access object properties using dot notation!</p>
+                <pre style="background:#1a1a1a;padding:15px;border-radius:4px;overflow-x:auto;"><code># Old way (still works):
+name = user['name']
+email = params.get('email')
+
+# New way with dot notation:
+name = user.name
+email = params.email</code></pre>
+
                 <h4 style="color:#6f42c1;margin-top:20px;">📥 Available Variables</h4>
                 <ul style="margin-left:20px;">
-                    <li><code style="background:#333;padding:2px 6px;border-radius:3px;">params</code> - Object containing parameters passed to the function</li>
-                    <li><code style="background:#333;padding:2px 6px;border-radius:3px;">data</code> - Object containing resources. Access as <code style="background:#333;padding:2px 6px;border-radius:3px;">data.resource_name</code></li>
+                    <li><code style="background:#333;padding:2px 6px;border-radius:3px;">params</code> - Parameters passed to the function (supports dot notation)</li>
+                    <li><code style="background:#333;padding:2px 6px;border-radius:3px;">data</code> - Object containing resources (e.g., <code style="background:#333;padding:2px 6px;border-radius:3px;">data.users</code>)</li>
+                    <li><code style="background:#333;padding:2px 6px;border-radius:3px;">users</code> - Direct access to resource named "users" (array of items)</li>
                 </ul>
 
                 <h4 style="color:#6f42c1;margin-top:20px;">📤 Return Value</h4>
                 <p>Set <code style="background:#333;padding:2px 6px;border-radius:3px;">result = your_value</code> to return a value.</p>
 
-                <h4 style="color:#6f42c1;margin-top:20px;">📚 Example: Filter Data</h4>
+                <h4 style="color:#6f42c1;margin-top:20px;">📚 Example: Filter Data (Dot Notation)</h4>
                 <pre style="background:#1a1a1a;padding:15px;border-radius:4px;overflow-x:auto;"><code># Filter users with age > 21
-users = data.get('users', [])
-adults = [u for u in users if u.get('age', 0) > 21]
-result = adults</code></pre>
+adults = [u for u in users if u.age and u.age > 21]
+result = adults
 
-                <h4 style="color:#6f42c1;margin-top:20px;">📚 Example: Use Parameters</h4>
+# Or access via params
+threshold = params.threshold or 21
+filtered = [u for u in users if u.age and u.age > threshold]</code></pre>
+
+                <h4 style="color:#6f42c1;margin-top:20px;">📚 Example: Use Parameters (Dot Notation)</h4>
                 <pre style="background:#1a1a1a;padding:15px;border-radius:4px;overflow-x:auto;"><code># Calculate total with discount
-items = data.get('items', [])
-total = sum(item.get('price', 0) for item in items)
-discount = params.get('discount', 0)
+total = sum(item.price for item in items)
+discount = params.discount or 0
 result = total * (1 - discount / 100)</code></pre>
 
-                <h4 style="color:#6f42c1;margin-top:20px;">📚 Example: Transform Data</h4>
+                <h4 style="color:#6f42c1;margin-top:20px;">📚 Example: Transform Data (Dot Notation)</h4>
                 <pre style="background:#1a1a1a;padding:15px;border-radius:4px;overflow-x:auto;"><code># Add full name field
-users = data.get('users', [])
 for user in users:
-    user['full_name'] = f"{user.get('first_name', '')} {user.get('last_name', '')}"
-result = users</code></pre>
+    user.full_name = f"{user.first_name} {user.last_name}"
+result = users
+
+# Access nested properties
+first_user = users[0]
+print(first_user.name)
+print(first_user.address.city)</code></pre>
 
                 <h4 style="color:#6f42c1;margin-top:20px;">📚 Available Python Features</h4>
                 <ul style="margin-left:20px;">
@@ -243,11 +260,10 @@ result = math.sqrt(16)</code></pre>
                 <h4 style="color:#6f42c1;margin-top:20px;">📋 Logs</h4>
                 <p>Use <code style="background:#333;padding:2px 6px;border-radius:3px;">print()</code> statements to log debug info. They will appear in the test results.</p>
                 <pre style="background:#1a1a1a;padding:15px;border-radius:4px;overflow-x:auto;"><code># Debug your function with print()
-items = data.get('items', [])
-print(f"Found {len(items)} items")
-for item in items:
-    print(f"Processing: {item}")
-result = items</code></pre>
+print(f"Found {len(users)} users")
+for user in users:
+    print(f"Processing: {user.name}")
+result = users</code></pre>
             </div>
             <div style="margin-top:20px;text-align:right;">
                 <button onclick="closeHelp()" class="btn-green">Got it!</button>
