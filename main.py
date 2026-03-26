@@ -463,7 +463,7 @@ def execute_function(func_data: Dict, params: Dict) -> Any:
 
 
 def generate_openapi_spec(resource: str):
-    base = f"/api/v1/{resource}"
+    base = f"/api/v1/r/{resource}"
     return {
         "openapi": "3.0.0",
         "info": {"title": f"API Docs: {resource}", "version": "1.2.0"},
