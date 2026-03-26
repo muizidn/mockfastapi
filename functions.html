@@ -225,6 +225,29 @@ result = users</code></pre>
                     <li>Dict operations: <code style="background:#333;padding:2px 6px;border-radius:3px;">{k: v for k, v in items}</code></li>
                     <li>Built-in functions: <code style="background:#333;padding:2px 6px;border-radius:3px;">sum(), len(), max(), min(), sorted()</code></li>
                 </ul>
+
+                <h4 style="color:#6f42c1;margin-top:20px;">📦 Import Standard Library</h4>
+                <p>You can import Python standard library modules:</p>
+                <pre style="background:#1a1a1a;padding:15px;border-radius:4px;overflow-x:auto;"><code>import json
+import re
+import datetime
+import math
+import random
+import collections
+
+# Use them in your code
+today = datetime.date.today()
+matches = re.findall(r'\d+', 'abc123def456')
+result = math.sqrt(16)</code></pre>
+
+                <h4 style="color:#6f42c1;margin-top:20px;">📋 Logs</h4>
+                <p>Use <code style="background:#333;padding:2px 6px;border-radius:3px;">print()</code> statements to log debug info. They will appear in the test results.</p>
+                <pre style="background:#1a1a1a;padding:15px;border-radius:4px;overflow-x:auto;"><code># Debug your function with print()
+items = data.get('items', [])
+print(f"Found {len(items)} items")
+for item in items:
+    print(f"Processing: {item}")
+result = items</code></pre>
             </div>
             <div style="margin-top:20px;text-align:right;">
                 <button onclick="closeHelp()" class="btn-green">Got it!</button>
@@ -539,7 +562,12 @@ result = users</code></pre>
             const data = await res.json();
             
             if (res.ok) {
-                document.getElementById('test-result').innerText = JSON.stringify(data.result, null, 2);
+                let output = '';
+                if (data.logs && data.logs.length > 0) {
+                    output += '📋 Logs:\n' + data.logs.join('\n') + '\n\n';
+                }
+                output += '✅ Result:\n' + JSON.stringify(data.result, null, 2);
+                document.getElementById('test-result').innerText = output;
                 document.getElementById('test-result').style.color = '#9cdcfe';
             } else {
                 document.getElementById('test-result').innerText = data.detail || 'Error';

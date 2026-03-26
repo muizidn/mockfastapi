@@ -196,15 +196,118 @@ def execute_function(func_data: Dict, params: Dict) -> Any:
     available_data = {}
     for res in resources:
         available_data[res] = get_resource_data(res)
+
+    import io
+    import sys
+    from contextlib import redirect_stdout
+
+    logs = []
     try:
         func_code = compile(body, "<string>", "exec")
-        func_globals = {"data": available_data, "params": params, "result": None}
+
+        safe_builtins = {
+            "__builtins__": {
+                "print": lambda *args, **kwargs: logs.append(
+                    " ".join(str(a) for a in args)
+                ),
+            },
+            "True": True,
+            "False": False,
+            "None": None,
+            "abs": abs,
+            "all": all,
+            "any": any,
+            "bin": bin,
+            "bool": bool,
+            "bytes": bytes,
+            "chr": chr,
+            "dict": dict,
+            "dir": dir,
+            "divmod": divmod,
+            "enumerate": enumerate,
+            "filter": filter,
+            "float": float,
+            "format": format,
+            "frozenset": frozenset,
+            "hash": hash,
+            "hex": hex,
+            "int": int,
+            "isinstance": isinstance,
+            "issubclass": issubclass,
+            "iter": iter,
+            "len": len,
+            "list": list,
+            "map": map,
+            "max": max,
+            "min": min,
+            "next": next,
+            "object": object,
+            "oct": oct,
+            "ord": ord,
+            "pow": pow,
+            "range": range,
+            "repr": repr,
+            "reversed": reversed,
+            "round": round,
+            "set": set,
+            "slice": slice,
+            "sorted": sorted,
+            "str": str,
+            "sum": sum,
+            "tuple": tuple,
+            "zip": zip,
+            "type": type,
+            "vars": vars,
+            "open": open,
+            "input": input,
+        }
+
+        allowed_imports = [
+            "json",
+            "re",
+            "datetime",
+            "math",
+            "random",
+            "collections",
+            "itertools",
+            "functools",
+            "uuid",
+            "hashlib",
+            "base64",
+            "urllib",
+            "urlparse",
+            "time",
+            "calendar",
+            "copy",
+            "string",
+            "textwrap",
+            "os",
+            "io",
+        ]
+
+        for mod_name in allowed_imports:
+            try:
+                mod = __import__(mod_name)
+                safe_builtins[mod_name] = mod
+            except:
+                pass
+
+        func_globals = {
+            "data": available_data,
+            "params": params,
+            "result": None,
+            **safe_builtins,
+        }
+
         exec(func_code, func_globals)
-        return func_globals.get("result")
+        return {"result": func_globals.get("result"), "logs": logs}
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Execution error: {str(e)}\n{traceback.format_exc()}",
+            detail=f"Execution error: {str(e)}\nLogs:\n"
+            + "\n".join(logs)
+            + "\n"
+            + traceback.format_exc(),
         )
 
 
