@@ -140,6 +140,16 @@
         .resource-item input { width: 200px; }
         .resource-list { max-height: 120px; overflow-y: auto; background: #2d2d2d; padding: 10px; border-radius: 2px; }
         .status-msg { font-size: 11px; color: #888; margin-left: auto; }
+        #help-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 50px;
+        }
     </style>
 </head>
 <body>
@@ -148,6 +158,7 @@
         <button onclick="openNewFuncModal()" class="btn-green">+ New Function</button>
         <button onclick="saveFunction()" id="save-btn" class="btn-green">Save</button>
         <button onclick="deleteFunction()" id="delete-btn" class="btn-red">Delete</button>
+        <button onclick="showHelp()" style="background:#6f42c1;">?</button>
         <span id="status" class="status-msg"></span>
     </div>
 
@@ -168,6 +179,55 @@
             <div style="margin-top: 15px; display: flex; gap: 10px;">
                 <button onclick="createFunction()" class="btn-green" style="flex:1;">Create</button>
                 <button onclick="closeModal()" style="flex:1; background:#666;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="help-modal">
+        <div style="background:var(--panel);padding:20px;border-radius:4px;width:700px;max-height:80vh;overflow:auto;">
+            <div class="modal-header">
+                <h3>Function Writing Guide</h3>
+                <button onclick="closeHelp()" style="background:#444;">✕</button>
+            </div>
+            <div style="font-size:13px;line-height:1.8;color:#ccc;">
+                <h4 style="color:#6f42c1;margin-top:20px;">📥 Available Variables</h4>
+                <ul style="margin-left:20px;">
+                    <li><code style="background:#333;padding:2px 6px;border-radius:3px;">params</code> - Object containing parameters passed to the function</li>
+                    <li><code style="background:#333;padding:2px 6px;border-radius:3px;">data</code> - Object containing resources. Access as <code style="background:#333;padding:2px 6px;border-radius:3px;">data.resource_name</code></li>
+                </ul>
+
+                <h4 style="color:#6f42c1;margin-top:20px;">📤 Return Value</h4>
+                <p>Set <code style="background:#333;padding:2px 6px;border-radius:3px;">result = your_value</code> to return a value.</p>
+
+                <h4 style="color:#6f42c1;margin-top:20px;">📚 Example: Filter Data</h4>
+                <pre style="background:#1a1a1a;padding:15px;border-radius:4px;overflow-x:auto;"><code># Filter users with age > 21
+users = data.get('users', [])
+adults = [u for u in users if u.get('age', 0) > 21]
+result = adults</code></pre>
+
+                <h4 style="color:#6f42c1;margin-top:20px;">📚 Example: Use Parameters</h4>
+                <pre style="background:#1a1a1a;padding:15px;border-radius:4px;overflow-x:auto;"><code># Calculate total with discount
+items = data.get('items', [])
+total = sum(item.get('price', 0) for item in items)
+discount = params.get('discount', 0)
+result = total * (1 - discount / 100)</code></pre>
+
+                <h4 style="color:#6f42c1;margin-top:20px;">📚 Example: Transform Data</h4>
+                <pre style="background:#1a1a1a;padding:15px;border-radius:4px;overflow-x:auto;"><code># Add full name field
+users = data.get('users', [])
+for user in users:
+    user['full_name'] = f"{user.get('first_name', '')} {user.get('last_name', '')}"
+result = users</code></pre>
+
+                <h4 style="color:#6f42c1;margin-top:20px;">📚 Available Python Features</h4>
+                <ul style="margin-left:20px;">
+                    <li>List comprehensions: <code style="background:#333;padding:2px 6px;border-radius:3px;">[x for x in items]</code></li>
+                    <li>Dict operations: <code style="background:#333;padding:2px 6px;border-radius:3px;">{k: v for k, v in items}</code></li>
+                    <li>Built-in functions: <code style="background:#333;padding:2px 6px;border-radius:3px;">sum(), len(), max(), min(), sorted()</code></li>
+                </ul>
+            </div>
+            <div style="margin-top:20px;text-align:right;">
+                <button onclick="closeHelp()" class="btn-green">Got it!</button>
             </div>
         </div>
     </div>
@@ -364,6 +424,14 @@
         function hideEditor() {
             document.getElementById('empty-state').style.display = 'flex';
             document.getElementById('editor-section').style.display = 'none';
+        }
+
+        function showHelp() {
+            document.getElementById('help-modal').style.display = 'flex';
+        }
+
+        function closeHelp() {
+            document.getElementById('help-modal').style.display = 'none';
         }
 
         function openNewFuncModal() {
