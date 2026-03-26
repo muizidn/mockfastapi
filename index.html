@@ -470,7 +470,7 @@
             (Ctrl+S)</button>
         <button onclick="openSchemaModal()" id="schema-btn" style="background: #6f42c1;">Set Schema</button>
         <span id="schema-indicator" class="status-msg" style="color: #6f42c1;"></span>
-        <span id="validation-error" class="status-msg" style="color: #dc3545; cursor: pointer; display: none;" onclick="showValidationError()"></span>
+        <span id="validation-error" style="color: white; font-weight: bold; cursor: pointer; display: none; background: #dc3545; padding: 6px 12px; border-radius: 4px; margin-left: 10px; font-size: 12px;" onclick="showValidationErrorDetails()" title="Click to see error details"></span>
         <span id="status" class="status-msg"></span>
         <div style="margin-left: auto; display: flex; gap: 5px;">
             <button onclick="toggleSidePanel()" id="toggle-panel-btn" style="background: #666;">Transform ▶</button>
@@ -1114,7 +1114,7 @@
                 document.getElementById('item-error').innerText = 'Schema validation failed: ' + validation.fields.join(', ');
                 document.getElementById('item-error').style.display = 'block';
                 window.validationErrors = validation.errors;
-                showValidationError(validation.error);
+                showValidationError(validation.error, validation.fields);
                 highlightRowWithError(validation);
                 return;
             }
@@ -1136,10 +1136,12 @@
             }
         }
 
-        function showValidationError(errorMsg) {
+        function showValidationError(errorMsg, errorFields) {
             if (!errorMsg) errorMsg = window.lastValidationError || 'Validation error';
-            document.getElementById('validation-error').innerText = '❌ ' + errorMsg.split('\n')[0].substring(0, 50);
-            document.getElementById('validation-error').style.display = 'inline';
+            
+            const errorText = '❌ Validation Error: ' + (errorFields ? errorFields.join(', ') : 'Check details');
+            document.getElementById('validation-error').innerText = errorText;
+            document.getElementById('validation-error').style.display = 'inline-block';
             window.lastValidationError = errorMsg;
             
             const fieldErrorsDiv = document.getElementById('field-errors');
@@ -1154,6 +1156,11 @@
                 fieldErrorsDiv.innerHTML = '<div style="color: #dc3545; font-weight: bold; margin-bottom: 5px;">Schema Validation Errors:</div>' + errorsList;
                 fieldErrorsDiv.style.display = 'block';
             }
+        }
+
+        function showValidationErrorDetails() {
+            const errorMsg = window.lastValidationError || 'Unknown validation error';
+            alert('Validation Error Details:\n\n' + errorMsg);
         }
 
         function clearValidationErrors() {
