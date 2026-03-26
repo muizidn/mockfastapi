@@ -470,6 +470,7 @@
             (Ctrl+S)</button>
         <button onclick="openSchemaModal()" id="schema-btn" style="background: #6f42c1;">Set Schema</button>
         <span id="schema-indicator" class="status-msg" style="color: #6f42c1;"></span>
+        <span id="validation-error" class="status-msg" style="color: #dc3545; cursor: pointer; display: none;" onclick="showValidationError()"></span>
         <span id="status" class="status-msg"></span>
         <div style="margin-left: auto; display: flex; gap: 5px;">
             <button onclick="toggleSidePanel()" id="toggle-panel-btn" style="background: #666;">Transform ▶</button>
@@ -523,7 +524,8 @@
             <div class="modal-body">
                 <div id="form-editor" class="show"></div>
                 <div id="json-editor-container"></div>
-                <div id="item-error" class="json-error" style="display:none;"></div>
+                <div id="item-error" class="json-error" style="display:none; margin-top: 10px;"></div>
+                <div id="field-errors" style="display:none; margin-top: 10px;"></div>
             </div>
             <div class="modal-footer">
                 <button onclick="closeItemModal()" style="background:#666;">Cancel</button>
@@ -851,7 +853,7 @@
 
             document.getElementById('table-body').innerHTML = dataToShow.map((item) => {
                 const originalIdx = tableData.findIndex(t => t.id === item.id);
-                return '<tr>' + columns.map(col => {
+                return `<tr data-row-index="${originalIdx}">` + columns.map(col => {
                     const val = item[col] !== undefined ? JSON.stringify(item[col]) : '';
                     return `<td><span style="white-space:nowrap;text-overflow:ellipsis;overflow:hidden;display:block;">${escapeHtml(val)}</span></td>`;
                 }).join('') + `<td>
@@ -1067,7 +1069,14 @@
                 const Ajv = window.ajv || (window.ajv = new Function('return ' + fetch('https://cdn.jsdelivr.net/npm/ajv@8/dist/ajv.bundle.min.js').then(r => r.text()).then(code => eval(code)))());
                 const validate = new Function('schema', 'data', `return ${code};`)();
                 if (!validate(data)) {
-                    return { valid: false, error: JSON.stringify(validate.errors, null, 2) };
+                    const errors = validate.errors;
+                    const errorFields = errors.map(e => e.instancePath.replace('/', '') || 'root').filter(Boolean);
+                    return { 
+                        valid: false, 
+                        error: JSON.stringify(errors, null, 2),
+                        errors: errors,
+                        fields: [...new Set(errorFields)]
+                    };
                 }
             } catch { }
             return { valid: true };
@@ -1083,6 +1092,7 @@
                 } catch (e) {
                     document.getElementById('item-error').innerText = 'Invalid JSON: ' + e.message;
                     document.getElementById('item-error').style.display = 'block';
+                    showValidationError('Invalid JSON: ' + e.message);
                     return;
                 }
             } else {
@@ -1092,10 +1102,22 @@
             if (Object.keys(data).length === 0) {
                 document.getElementById('item-error').innerText = 'Item cannot be empty';
                 document.getElementById('item-error').style.display = 'block';
+                showValidationError('Item cannot be empty');
                 return;
             }
 
             document.getElementById('item-error').style.display = 'none';
+            clearValidationErrors();
+
+            const validation = await validateItemData(data);
+            if (!validation.valid) {
+                document.getElementById('item-error').innerText = 'Schema validation failed: ' + validation.fields.join(', ');
+                document.getElementById('item-error').style.display = 'block';
+                window.validationErrors = validation.errors;
+                showValidationError(validation.error);
+                highlightRowWithError(validation);
+                return;
+            }
 
             try {
                 if (itemMode === 'add') {
@@ -1106,10 +1128,57 @@
                 await saveTableData();
                 closeItemModal();
                 renderTable();
+                clearValidationErrors();
             } catch (e) {
                 document.getElementById('item-error').innerText = e.message;
                 document.getElementById('item-error').style.display = 'block';
+                showValidationError(e.message);
             }
+        }
+
+        function showValidationError(errorMsg) {
+            if (!errorMsg) errorMsg = window.lastValidationError || 'Validation error';
+            document.getElementById('validation-error').innerText = '❌ ' + errorMsg.split('\n')[0].substring(0, 50);
+            document.getElementById('validation-error').style.display = 'inline';
+            window.lastValidationError = errorMsg;
+            
+            const fieldErrorsDiv = document.getElementById('field-errors');
+            if (window.validationErrors) {
+                const errorsList = window.validationErrors.map(e => {
+                    const path = e.instancePath.replace('/', '') || 'root';
+                    return `<div style="color: #ffc107; margin: 5px 0;">
+                        <strong>Field: ${path}</strong><br>
+                        <span style="color: #ccc; font-size: 12px;">${e.message}</span>
+                    </div>`;
+                }).join('');
+                fieldErrorsDiv.innerHTML = '<div style="color: #dc3545; font-weight: bold; margin-bottom: 5px;">Schema Validation Errors:</div>' + errorsList;
+                fieldErrorsDiv.style.display = 'block';
+            }
+        }
+
+        function clearValidationErrors() {
+            document.getElementById('validation-error').style.display = 'none';
+            document.getElementById('item-error').style.display = 'none';
+            document.getElementById('field-errors').style.display = 'none';
+            window.validationErrors = null;
+            clearRowHighlights();
+        }
+
+        function highlightRowWithError(validation) {
+            const rowIndex = itemMode === 'edit' ? editIndex : tableData.length;
+            const row = document.querySelector(`[data-row-index="${rowIndex}"]`);
+            if (row) {
+                row.style.background = 'rgba(220, 53, 69, 0.2)';
+                row.style.border = '2px solid #dc3545';
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        function clearRowHighlights() {
+            document.querySelectorAll('[data-row-index]').forEach(row => {
+                row.style.background = '';
+                row.style.border = '';
+            });
         }
 
         function deleteRow(idx) {
