@@ -35,6 +35,7 @@
             cursor: pointer;
         }
         button:hover { filter: brightness(1.2); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-red { background: #dc3545; }
         .btn-green { background: #28a745; }
         input, select {
@@ -67,7 +68,7 @@
             align-items: center;
         }
         .log-item:hover { background: #2a2d2e; }
-        .log-item.active { background: #37373d; border-left: 3px solid var(--accent); }
+        .log-item.selected { background: #37373d; border-left: 3px solid var(--accent); }
         .method {
             font-weight: bold;
             padding: 3px 8px;
@@ -111,18 +112,6 @@
             white-space: pre-wrap;
             word-break: break-all;
         }
-        .badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 3px;
-            font-size: 11px;
-            margin-right: 5px;
-        }
-        .badge-new { background: #dc3545; animation: pulse 1s infinite; }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
         #filters {
             padding: 10px 15px;
             background: #2d2d2d;
@@ -139,13 +128,87 @@
             padding: 50px;
             color: #666;
         }
-        .realtime-badge {
-            background: #dc3545;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 10px;
-            animation: pulse 1s infinite;
+        #diff-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #diff-modal.active { display: flex; flex-direction: column; }
+        #diff-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: var(--panel);
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        #diff-header h3 { margin: 0; color: white; }
+        #diff-controls {
+            padding: 15px;
+            background: var(--panel);
+            border-radius: 4px;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        #diff-controls label { color: #ccc; font-size: 13px; }
+        #diff-controls input[type="checkbox"] {
+            margin-right: 5px;
+        }
+        #diff-content {
+            flex: 1;
+            display: flex;
+            gap: 10px;
+            min-height: 0;
+        }
+        .diff-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--panel);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .diff-panel-header {
+            padding: 10px 15px;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .diff-panel-content {
+            flex: 1;
+            overflow: auto;
+            padding: 15px;
+        }
+        .diff-line {
+            font-family: monospace;
+            font-size: 12px;
+            padding: 2px 5px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .diff-line.added { background: rgba(40, 167, 69, 0.2); color: #28a745; }
+        .diff-line.removed { background: rgba(220, 53, 69, 0.2); color: #dc3545; }
+        .diff-line.changed { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+        .checkbox-cell {
+            width: 30px;
+            flex-shrink: 0;
+        }
+        .checkbox-cell input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -153,6 +216,7 @@
     <div id="toolbar">
         <a href="/" style="color: var(--accent); text-decoration: none; font-weight: bold;">← Back</a>
         <strong>API Logs</strong>
+        <button id="diff-btn" onclick="openDiffModal()" disabled>Compare Selected (0)</button>
         <button onclick="clearLogs()" class="btn-red">Clear All</button>
         <span id="count" style="margin-left:auto;color:#888;font-size:12px;"></span>
     </div>
@@ -166,6 +230,7 @@
                 <option value="POST">POST</option>
                 <option value="PUT">PUT</option>
                 <option value="DELETE">DELETE</option>
+                <option value="PATCH">PATCH</option>
             </select>
         </div>
         <div class="filter-group">
@@ -208,10 +273,39 @@
         </div>
     </div>
 
+    <div id="diff-modal">
+        <div id="diff-header">
+            <h3>📊 Diff Comparison</h3>
+            <div>
+                <button onclick="closeDiffModal()">Close</button>
+            </div>
+        </div>
+        
+        <div id="diff-controls">
+            <label>Diff Type:</label>
+            <select id="diff-type" onchange="performDiff()">
+                <option value="body">Request Body</option>
+                <option value="response">Response Body</option>
+                <option value="headers">Headers</option>
+                <option value="query">Query Params</option>
+            </select>
+        </div>
+
+        <div id="diff-content">
+            <div class="diff-panel">
+                <div class="diff-panel-header" id="diff-left-header">Log 1</div>
+                <div class="diff-panel-content" id="diff-left"></div>
+            </div>
+            <div class="diff-panel">
+                <div class="diff-panel-header" id="diff-right-header">Log 2</div>
+                <div class="diff-panel-content" id="diff-right"></div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let logs = [];
-        let selectedLogId = null;
-        let debounceTimer = null;
+        let selectedLogs = new Set();
 
         async function refreshLogs() {
             const method = document.getElementById('filter-method').value;
@@ -245,24 +339,132 @@
 
             container.innerHTML = logs.map(log => {
                 const statusClass = log.status_code >= 200 && log.status_code < 300 ? 'success' : 'error';
+                const isSelected = selectedLogs.has(log.id);
                 return `
-                    <div class="log-item ${log.id === selectedLogId ? 'active' : ''}" onclick="selectLog(${log.id}, event)">
+                    <div class="log-item ${isSelected ? 'selected' : ''}">
+                        <div class="checkbox-cell">
+                            <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleLogSelection(${log.id}, event)">
+                        </div>
                         <span class="method ${log.method}">${log.method}</span>
                         <span class="endpoint">${log.endpoint}</span>
                         <span class="status ${statusClass}">${log.status_code}</span>
                         <span class="duration">${log.duration_ms?.toFixed(0) || 0}ms</span>
+                        <span class="timestamp">${new Date(log.timestamp).toLocaleTimeString()}</span>
+                        <span style="margin-left:10px;cursor:pointer;color:#007acc;" onclick="selectLog(${log.id}, event)">View</span>
                     </div>
                 `;
             }).join('');
         }
 
+        function toggleLogSelection(id, event) {
+            event.stopPropagation();
+            if (selectedLogs.has(id)) {
+                selectedLogs.delete(id);
+            } else {
+                if (selectedLogs.size >= 2) {
+                    const firstId = selectedLogs.values().next().value;
+                    selectedLogs.delete(firstId);
+                }
+                selectedLogs.add(id);
+            }
+            updateDiffButton();
+            renderLogs();
+        }
+
+        function updateDiffButton() {
+            const btn = document.getElementById('diff-btn');
+            btn.textContent = `Compare Selected (${selectedLogs.size})`;
+            btn.disabled = selectedLogs.size !== 2;
+        }
+
+        function openDiffModal() {
+            if (selectedLogs.size !== 2) return;
+            document.getElementById('diff-modal').classList.add('active');
+            performDiff();
+        }
+
+        function closeDiffModal() {
+            document.getElementById('diff-modal').classList.remove('active');
+        }
+
+        function performDiff() {
+            const selectedIds = Array.from(selectedLogs);
+            const log1 = logs.find(l => l.id === selectedIds[0]);
+            const log2 = logs.find(l => l.id === selectedIds[1]);
+            
+            if (!log1 || !log2) return;
+
+            const diffType = document.getElementById('diff-type').value;
+            document.getElementById('diff-left-header').textContent = `${log1.method} ${log1.endpoint}`;
+            document.getElementById('diff-right-header').textContent = `${log2.method} ${log2.endpoint}`;
+
+            let content1, content2;
+            
+            switch(diffType) {
+                case 'body':
+                    content1 = log1.request_body || '';
+                    content2 = log2.request_body || '';
+                    break;
+                case 'response':
+                    content1 = log1.response_body || '';
+                    content2 = log2.response_body || '';
+                    break;
+                case 'headers':
+                    content1 = log1.headers || '';
+                    content2 = log2.headers || '';
+                    try {
+                        content1 = JSON.stringify(JSON.parse(content1), null, 2);
+                        content2 = JSON.stringify(JSON.parse(content2), null, 2);
+                    } catch {}
+                    break;
+                case 'query':
+                    content1 = log1.query_params || '';
+                    content2 = log2.query_params || '';
+                    try {
+                        content1 = JSON.stringify(JSON.parse(content1), null, 2);
+                        content2 = JSON.stringify(JSON.parse(content2), null, 2);
+                    } catch {}
+                    break;
+            }
+
+            const lines1 = content1.split('\n');
+            const lines2 = content2.split('\n');
+            
+            const maxLines = Math.max(lines1.length, lines2.length);
+            let leftHtml = '';
+            let rightHtml = '';
+            
+            for (let i = 0; i < maxLines; i++) {
+                const line1 = lines1[i] || '';
+                const line2 = lines2[i] || '';
+                
+                let className = '';
+                if (line1 && !line2) {
+                    className = 'removed';
+                } else if (!line1 && line2) {
+                    className = 'added';
+                } else if (line1 !== line2) {
+                    className = 'changed';
+                }
+                
+                leftHtml += `<div class="diff-line ${className}">${escapeHtml(line1) || '&nbsp;'}</div>`;
+                rightHtml += `<div class="diff-line ${className}">${escapeHtml(line2) || '&nbsp;'}</div>`;
+            }
+
+            document.getElementById('diff-left').innerHTML = leftHtml;
+            document.getElementById('diff-right').innerHTML = rightHtml;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         function selectLog(id, event) {
-            selectedLogId = id;
+            event.stopPropagation();
             const log = logs.find(l => l.id === id);
             if (!log) return;
-
-            document.querySelectorAll('.log-item').forEach(el => el.classList.remove('active'));
-            event.target.closest('.log-item')?.classList.add('active');
 
             document.getElementById('log-detail-content').style.display = 'block';
             document.getElementById('log-detail-content').innerHTML = `
@@ -276,7 +478,7 @@
 
                 <div class="section">
                     <div class="section-title">📝 Query Params</div>
-                    <pre>${log.query_params ? JSON.stringify(JSON.parse(log.query_params), null, 2) : '(none)'}</pre>
+                    <pre>${formatJson(log.query_params)}</pre>
                 </div>
 
                 <div class="section">
@@ -303,22 +505,25 @@
 
                 <div class="section">
                     <div class="section-title">📨 Headers</div>
-                    <pre>${log.headers ? JSON.stringify(JSON.parse(log.headers), null, 2) : '(none)'}</pre>
+                    <pre>${formatJson(log.headers)}</pre>
                 </div>
             `;
         }
 
         function formatJson(str) {
+            if (!str) return '(none)';
             try {
                 return JSON.stringify(JSON.parse(str), null, 2);
             } catch {
-                return str || '(none)';
+                return str;
             }
         }
 
         async function clearLogs() {
             if (!confirm('Clear all logs?')) return;
             await fetch('/api/v1/logs', { method: 'DELETE' });
+            selectedLogs.clear();
+            updateDiffButton();
             refreshLogs();
         }
 
@@ -326,6 +531,8 @@
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(refreshLogs, 300);
         }
+
+        let debounceTimer = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             refreshLogs();
