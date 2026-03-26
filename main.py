@@ -260,6 +260,32 @@ def execute_function(func_data: Dict, params: Dict) -> Any:
             "vars": vars,
             "open": open,
             "input": input,
+            "json": __import__("json"),
+            "re": __import__("re"),
+            "datetime": __import__("datetime"),
+            "math": __import__("math"),
+            "random": __import__("random"),
+            "collections": __import__("collections"),
+            "itertools": __import__("itertools"),
+            "functools": __import__("functools"),
+            "uuid": __import__("uuid"),
+            "hashlib": __import__("hashlib"),
+            "base64": __import__("base64"),
+            "urllib": __import__("urllib"),
+            "time": __import__("time"),
+            "calendar": __import__("calendar"),
+            "copy": __import__("copy"),
+            "string": __import__("string"),
+            "textwrap": __import__("textwrap"),
+            "os": __import__("os"),
+            "io": __import__("io"),
+        }
+
+        func_globals = {
+            "data": available_data,
+            "params": params,
+            "result": None,
+            **safe_builtins,
         }
 
         allowed_imports = [
