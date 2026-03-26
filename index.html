@@ -1130,7 +1130,7 @@
                 window.validationErrors = validation.errors;
                 showValidationError(validation.error, validation.fields);
                 highlightRowWithError(validation);
-                highlightEditorErrors(validation);
+                highlightEditorErrors(validation, data);
                 return;
             }
 
@@ -1157,6 +1157,8 @@
             const errorText = '❌ Validation Error: ' + (errorFields ? errorFields.join(', ') : 'Check details');
             document.getElementById('validation-error').innerText = errorText;
             document.getElementById('validation-error').style.display = 'inline-block';
+            document.getElementById('validation-error').style.cursor = 'pointer';
+            document.getElementById('validation-error').title = 'Click to see error details';
             window.lastValidationError = errorMsg;
             
             document.getElementById('error-banner-text').innerHTML = errorMsg.replace(/\n/g, '<br>');
@@ -1217,33 +1219,38 @@
         }
 
         function clearEditorErrors() {
-            if (itemEditor) {
-                itemEditor.deltaDecorations(itemEditor.getModel().getAllDecorations().map(d => d.id), []);
+            if (itemEditor && window.editorDecorationIds) {
+                itemEditor.deltaDecorations(window.editorDecorationIds, []);
+                window.editorDecorationIds = [];
             }
         }
 
-        function highlightEditorErrors(validation) {
+        function highlightEditorErrors(validation, data) {
             if (!validation || !validation.errors || !itemEditor) return;
             
+            clearEditorErrors();
+            
             const decorations = [];
-            const editorModel = itemEditor.getModel();
-            if (!editorModel) return;
-            
-            const jsonContent = editorModel.getValue();
-            
             validation.errors.forEach(error => {
-                const path = error.instancePath.replace('/', '').split('/').pop() || '';
+                const path = error.instancePath.replace('/', '').split('/').filter(Boolean);
+                
+                if (path.length === 0) return;
+                
+                const fieldName = path[path.length - 1];
+                let searchIn = data;
+                for (const p of path.slice(0, -1)) {
+                    searchIn = searchIn[p];
+                    if (!searchIn) return;
+                }
+                
+                const jsonContent = itemEditor.getValue();
+                const regex = new RegExp(`"(${fieldName})"\\s*:`);
                 
                 const lines = jsonContent.split('\n');
                 for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
-                    const fieldMatch = line.match(new RegExp(`"${path}"\\s*:`));
-                    if (fieldMatch) {
-                        const startPos = editorModel.getPositionAt(
-                            jsonContent.split('\n').slice(0, i).join('\n').length + line.indexOf(`"${path}"`)
-                        );
+                    if (regex.test(lines[i])) {
                         decorations.push({
-                            range: new monaco.Range(i + 1, 1, i + 1, line.length + 1),
+                            range: new monaco.Range(i + 1, 1, i + 1, lines[i].length + 1),
                             options: {
                                 isWholeLine: true,
                                 className: 'editor-error-line',
@@ -1257,7 +1264,7 @@
             });
             
             if (decorations.length > 0) {
-                itemEditor.deltaDecorations([], decorations);
+                window.editorDecorationIds = itemEditor.deltaDecorations([], decorations);
             }
         }
 
