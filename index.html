@@ -1303,8 +1303,13 @@
                 } else {
                     const err = await res.json();
                     document.getElementById('save-btn').innerText = "Save (Ctrl+S)";
-                    document.getElementById('status').innerText = "❌ " + (err.detail || 'Save Failed');
-                    throw new Error(err.detail || 'Save Failed');
+                    const errorMsg = err.detail || 'Save Failed';
+                    document.getElementById('status').innerText = "❌ " + errorMsg;
+                    document.getElementById('status').style.cursor = 'pointer';
+                    document.getElementById('status').title = 'Click to see details';
+                    document.getElementById('status').onclick = () => alert('Save Error:\n\n' + errorMsg);
+                    window.lastValidationError = errorMsg;
+                    throw new Error(errorMsg);
                 }
             } catch (e) {
                 document.getElementById('save-btn').innerText = "Save (Ctrl+S)";
