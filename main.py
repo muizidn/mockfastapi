@@ -388,7 +388,28 @@ def execute_function(func_data: Dict, params: Dict) -> Any:
 
     logs = []
     try:
-        func_code = compile(body, "<string>", "exec")
+        has_return = (
+            "return " in body
+            or "\nreturn " in body
+            or body.strip().startswith("return ")
+        )
+
+        if has_return:
+            indented_body = "\n".join(
+                "    " + line for line in body.strip().split("\n")
+            )
+            func_code = compile(
+                f"""
+def _user_func(data, params):
+{indented_body}
+
+_result = _user_func(data, params)
+""",
+                "<string>",
+                "exec",
+            )
+        else:
+            func_code = compile(body, "<string>", "exec")
 
         safe_builtins = {
             "__builtins__": {
@@ -476,8 +497,15 @@ def execute_function(func_data: Dict, params: Dict) -> Any:
             **available_data,
         }
 
-        exec(func_code, func_globals)
-        return {"result": func_globals.get("result"), "logs": logs}
+        if "return " in body or "\nreturn " in body or body.startswith("return "):
+            exec(func_code, func_globals)
+        else:
+            exec(func_code, func_globals)
+
+        return {
+            "result": func_globals.get("result") or func_globals.get("_result"),
+            "logs": logs,
+        }
     except Exception as e:
         raise HTTPException(
             status_code=500,
