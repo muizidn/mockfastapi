@@ -222,6 +222,7 @@
         let params = [];
         let selectedResources = [];
         let isDirty = false;
+        let monacoReady = false;
 
         require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
         require(['vs/editor/editor.main'], function () {
@@ -233,9 +234,15 @@
                 fontSize: 13
             });
             editor.onDidChangeModelContent(() => markDirty());
+            monacoReady = true;
             loadFunctions();
             loadResources();
         });
+
+        window.onerror = function(msg, url, line, col, error) {
+            console.error('Error:', msg, 'at line', line);
+            return false;
+        };
 
         async function loadFunctions() {
             const res = await fetch('/api/v1/functions');
@@ -379,18 +386,25 @@
         }
 
         async function saveFunction() {
-            if (!currentFunc) return;
+            console.log('saveFunction called');
+            if (!currentFunc) {
+                console.log('No currentFunc');
+                return;
+            }
             
             currentFunc.description = document.getElementById('func-desc').value;
             currentFunc.params = params;
             currentFunc.resources = selectedResources;
             currentFunc.body = editor.getValue();
             
+            console.log('Saving:', currentFunc);
+            
             const res = await fetch(`/api/v1/functions/${currentFunc.name}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(currentFunc)
             });
+            console.log('Response:', res);
             
             if (res.ok) {
                 document.getElementById('status').innerText = '✅ Saved ' + new Date().toLocaleTimeString();
@@ -403,10 +417,15 @@
         }
 
         async function deleteFunction() {
-            if (!currentFunc) return;
+            console.log('deleteFunction called');
+            if (!currentFunc) {
+                console.log('No currentFunc');
+                return;
+            }
             if (!confirm(`Delete function ${currentFunc.name}?`)) return;
             
             const res = await fetch(`/api/v1/functions/${currentFunc.name}`, { method: 'DELETE' });
+            console.log('Response:', res);
             
             if (res.ok) {
                 currentFunc = null;
@@ -422,7 +441,11 @@
         }
 
         async function runFunction() {
-            if (!currentFunc) return;
+            console.log('runFunction called');
+            if (!currentFunc) {
+                console.log('No currentFunc');
+                return;
+            }
             
             const testParams = {};
             params.forEach(p => {
@@ -436,6 +459,7 @@
                 }
             });
             
+            console.log('Params:', testParams);
             document.getElementById('test-result').innerText = 'Running...';
             
             const res = await fetch(`/api/v1/functions/${currentFunc.name}/run`, {
@@ -443,8 +467,10 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(testParams)
             });
+            console.log('Response:', res);
             
             const data = await res.json();
+            console.log('Data:', data);
             
             if (res.ok) {
                 document.getElementById('test-result').innerText = JSON.stringify(data.result, null, 2);
