@@ -96,6 +96,10 @@ async def broadcast_log(log_data: Dict):
 async def log_requests(request: Request, call_next):
     start_time = datetime.now()
 
+    # Skip logging for WebSocket and static files
+    if request.url.path.startswith("/ws/") or request.url.path.startswith("/_next/"):
+        return await call_next(request)
+
     body = None
     if request.method in ["POST", "PUT", "PATCH"]:
         try:
@@ -114,47 +118,34 @@ async def log_requests(request: Request, call_next):
 
     duration = (datetime.now() - start_time).total_seconds() * 1000
 
-    try:
-        response_body = b""
-        async for chunk in response.body_iterator:
-            response_body += chunk
-        response_body = response_body.decode() if response_body else ""
+    log_data = {
+        "timestamp": datetime.now().isoformat(),
+        "method": request.method,
+        "endpoint": str(request.url.path),
+        "params": json.dumps(dict(request.path_params))
+        if request.path_params
+        else None,
+        "headers": json.dumps(
+            {
+                k: v
+                for k, v in request.headers.items()
+                if k.lower() not in ["authorization", "cookie", "host"]
+            }
+        ),
+        "query_params": json.dumps(dict(request.query_params))
+        if request.query_params
+        else None,
+        "request_body": body[:10000] if body else None,
+        "response_body": None,
+        "status_code": response.status_code,
+        "duration_ms": round(duration, 2),
+        "function_logs": None,
+    }
 
-        log_data = {
-            "timestamp": datetime.now().isoformat(),
-            "method": request.method,
-            "endpoint": str(request.url.path),
-            "params": json.dumps(dict(request.path_params))
-            if request.path_params
-            else None,
-            "headers": json.dumps(
-                {
-                    k: v
-                    for k, v in request.headers.items()
-                    if k.lower() not in ["authorization", "cookie"]
-                }
-            ),
-            "query_params": json.dumps(dict(request.query_params))
-            if request.query_params
-            else None,
-            "request_body": body[:10000] if body else None,
-            "response_body": response_body[:10000] if response_body else None,
-            "status_code": response.status_code,
-            "duration_ms": round(duration, 2),
-            "function_logs": None,
-        }
+    asyncio.create_task(log_api_call(log_data))
+    asyncio.create_task(broadcast_log(log_data))
 
-        asyncio.create_task(log_api_call(log_data))
-        asyncio.create_task(broadcast_log(log_data))
-
-        return Response(
-            content=response_body,
-            status_code=response.status_code,
-            headers=dict(response.headers),
-            media_type=response.media_type,
-        )
-    except Exception as e:
-        return response
+    return response
 
 
 # --- FILTER ENGINE ---
@@ -573,6 +564,108 @@ async def delete_resource_file(resource: str):
     if os.path.exists(schema_path):
         os.remove(schema_path)
     return {"message": "Resource Deleted"}
+
+
+# --- CLEAN CRUD ROUTES ---
+
+
+@app.get("/api/v1/{resource}")
+async def read_all(resource: str, filter: Optional[str] = Query(None)):
+    data = get_resource_data(resource)
+    return apply_complex_filter(data, filter) if filter else data
+
+
+@app.post("/api/v1/{resource}")
+async def create_item(resource: str, item: Dict[str, Any] = Body(...)):
+    schema = get_resource_schema(resource)
+    if schema:
+        valid, error = validate_against_schema(item, schema)
+        if not valid:
+            raise HTTPException(
+                status_code=400, detail=f"Schema validation failed: {error}"
+            )
+    data = get_resource_data(resource)
+    data.append(item)
+    save_resource_data(resource, data)
+    return {"status": "ok"}
+
+
+@app.post("/api/v1/{resource}/bulk/update")
+async def bulk_overwrite(resource: str, items: Any = Body(...)):
+    schema = get_resource_schema(resource)
+    if schema:
+        for i, item in enumerate(items):
+            valid, error = validate_against_schema(item, schema)
+            if not valid:
+                raise HTTPException(status_code=400, detail=f"Item {i}: {error}")
+    save_resource_data(resource, items)
+    return {"status": "ok"}
+
+
+@app.get("/api/v1/{resource}/{item_id}")
+async def read_one(resource: str, item_id: str):
+    data = get_resource_data(resource)
+    item = next((i for i in data if str(i.get("id")) == item_id), None)
+    if not item:
+        raise HTTPException(status_code=404)
+    return item
+
+
+@app.put("/api/v1/{resource}/{item_id}")
+async def update_item(
+    resource: str, item_id: str, updated_item: Dict[str, Any] = Body(...)
+):
+    schema = get_resource_schema(resource)
+    if schema:
+        valid, error = validate_against_schema(updated_item, schema)
+        if not valid:
+            raise HTTPException(
+                status_code=400, detail=f"Schema validation failed: {error}"
+            )
+    data = get_resource_data(resource)
+    for i, item in enumerate(data):
+        if str(item.get("id")) == item_id:
+            data[i] = updated_item
+            save_resource_data(resource, data)
+            return updated_item
+    raise HTTPException(status_code=404)
+
+
+@app.delete("/api/v1/{resource}/{item_id}")
+async def delete_item(resource: str, item_id: str):
+    data = get_resource_data(resource)
+    new_data = [item for item in data if str(item.get("id")) != item_id]
+    save_resource_data(resource, new_data)
+    return {"message": "Deleted"}
+
+
+# --- SCHEMA ROUTES ---
+
+
+@app.get("/api/v1/{resource}/schema")
+async def get_schema(resource: str):
+    schema = get_resource_schema(resource)
+    if schema is None:
+        raise HTTPException(
+            status_code=404, detail="No schema defined for this resource"
+        )
+    return schema
+
+
+@app.put("/api/v1/{resource}/schema")
+async def set_schema(resource: str, schema: Dict = Body(...)):
+    try:
+        jsonschema.Draft7Validator.check_schema(schema)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid schema: {e}")
+    save_resource_schema(resource, schema)
+    return {"status": "ok"}
+
+
+@app.delete("/api/v1/{resource}/schema")
+async def delete_schema(resource: str):
+    delete_resource_schema(resource)
+    return {"status": "ok"}
 
 
 # --- FUNCTION ROUTES ---
