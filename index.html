@@ -665,7 +665,7 @@
         async function createNewProject() {
             const name = document.getElementById('new-proj-input').value.trim().replace('.json', '');
             if (!name) return;
-            await fetch(`/api/v1/${name}/bulk/update`, {
+            await fetch(`/api/v1/r/${name}/bulk/update`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: '[]'
@@ -756,7 +756,7 @@
             localStorage.setItem('last_active_resource', name);
             document.getElementById('current-file-label').innerText = `/${name}.json`;
 
-            const res = await fetch(`/api/v1/${name}`);
+            const res = await fetch(`/api/v1/r/${name}`);
             const data = await res.json();
 
             editor.setValue(JSON.stringify(data, null, 4));
@@ -777,8 +777,8 @@
             if (!activeProject) return;
             
             const [allRes, filteredRes] = await Promise.all([
-                fetch(`/api/v1/${activeProject}`),
-                fetch(`/api/v1/${activeProject}${document.getElementById('filter-input').value.trim() ? '?filter=' + encodeURIComponent(document.getElementById('filter-input').value.trim()) : ''}`)
+                fetch(`/api/v1/r/${activeProject}`),
+                fetch(`/api/v1/r/${activeProject}${document.getElementById('filter-input').value.trim() ? '?filter=' + encodeURIComponent(document.getElementById('filter-input').value.trim()) : ''}`)
             ]);
             
             const allData = await allRes.json();
@@ -848,8 +848,8 @@
 
             try {
                 const url = filterQuery 
-                    ? `/api/v1/${activeProject}?filter=${encodeURIComponent(filterQuery)}`
-                    : `/api/v1/${activeProject}`;
+                    ? `/api/v1/r/${activeProject}?filter=${encodeURIComponent(filterQuery)}`
+                    : `/api/v1/r/${activeProject}`;
                 
                 const res = await fetch(url);
                 if (res.ok) {
@@ -1021,7 +1021,7 @@
         }
 
         function validateItemData(data) {
-            const schemaRes = fetch(`/api/v1/${activeProject}/schema`).then(r => r.ok ? r.json() : null);
+            const schemaRes = fetch(`/api/v1/r/${activeProject}/schema`).then(r => r.ok ? r.json() : null);
             return schemaRes.then(schema => {
                 if (!schema) return { valid: true };
                 try {
@@ -1086,7 +1086,7 @@
             document.getElementById('status').innerText = "";
 
             try {
-                const res = await fetch(`/api/v1/${activeProject}/bulk/update`, {
+                const res = await fetch(`/api/v1/r/${activeProject}/bulk/update`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(tableData)
@@ -1098,8 +1098,8 @@
                     
                     const filterQuery = document.getElementById('filter-input').value.trim();
                     const [allRes, filteredRes] = await Promise.all([
-                        fetch(`/api/v1/${activeProject}`),
-                        filterQuery ? fetch(`/api/v1/${activeProject}?filter=${encodeURIComponent(filterQuery)}`) : Promise.resolve({ json: () => [] })
+                        fetch(`/api/v1/r/${activeProject}`),
+                        filterQuery ? fetch(`/api/v1/r/${activeProject}?filter=${encodeURIComponent(filterQuery)}`) : Promise.resolve({ json: () => [] })
                     ]);
                     
                     tableData = await allRes.json() || [];
@@ -1136,7 +1136,7 @@
             status.innerText = "";
 
             try {
-                const res = await fetch(`/api/v1/${activeProject}/bulk/update`, {
+                const res = await fetch(`/api/v1/r/${activeProject}/bulk/update`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: content
@@ -1202,7 +1202,7 @@
 
         async function checkSchema() {
             try {
-                const res = await fetch(`/api/v1/${activeProject}/schema`);
+                const res = await fetch(`/api/v1/r/${activeProject}/schema`);
                 document.getElementById('schema-indicator').innerText = res.ok ? '✓ Schema' : '';
             } catch { document.getElementById('schema-indicator').innerText = ''; }
         }
@@ -1251,7 +1251,7 @@
 
         async function loadSchema() {
             try {
-                const res = await fetch(`/api/v1/${activeProject}/schema`);
+                const res = await fetch(`/api/v1/r/${activeProject}/schema`);
                 if (res.ok) {
                     const schema = await res.json();
                     schemaEditor.setValue(JSON.stringify(schema, null, 4));
@@ -1270,7 +1270,7 @@
             catch (e) { status.innerText = "❌ Invalid JSON"; return; }
 
             try {
-                const res = await fetch(`/api/v1/${activeProject}/schema`, {
+                const res = await fetch(`/api/v1/r/${activeProject}/schema`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: content
@@ -1288,7 +1288,7 @@
         async function deleteSchema() {
             if (!confirm('Delete schema?')) return;
             try {
-                const res = await fetch(`/api/v1/${activeProject}/schema`, { method: 'DELETE' });
+                const res = await fetch(`/api/v1/r/${activeProject}/schema`, { method: 'DELETE' });
                 if (res.ok) {
                     document.getElementById('schema-status').innerText = "✅ Schema deleted";
                     document.getElementById('schema-indicator').innerText = '';
