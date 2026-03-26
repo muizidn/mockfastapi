@@ -18,7 +18,7 @@ COPY functions.html .
 
 # Create the data and schema directories (it will be overridden by the volume,
 # but this ensures correct permissions)
-RUN mkdir -p /app/data /app/data/schema /app/data/functions
+RUN mkdir -p /app/data /app/data/schema /app/data/functions /app/data/banner-images
 
 # Expose the port FastAPI runs on
 EXPOSE 8000

@@ -430,11 +430,30 @@
             background: rgba(220, 53, 69, 0.2);
             border-radius: 2px;
         }
+
+        #banner-content img {
+            max-width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+        }
+
+        .banner-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.4);
+            cursor: pointer;
+        }
+
+        .banner-dot.active {
+            background: white;
+        }
     </style>
 </head>
 
 <body>
     <div id="toolbar">
+        <a href="/functions" style="color: var(--accent); text-decoration: none; font-weight: bold;">⚡ Functions</a>
         <strong>QUICK MOCK API</strong>
         <span id="current-file-label" style="color: #61afef; font-size: 13px; font-family: monospace;"></span>
         <div style="margin-right: 10px; display: flex; gap: 5px;">
@@ -449,6 +468,17 @@
         <span id="status" class="status-msg"></span>
         <div style="margin-left: auto; display: flex; gap: 5px;">
             <button onclick="toggleSidePanel()" id="toggle-panel-btn" style="background: #666;">Transform ▶</button>
+        </div>
+    </div>
+
+    <div id="banner-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:2000;justify-content:center;align-items:center;flex-direction:column;">
+        <div id="banner-carousel" style="max-width:800px;max-height:400px;background:var(--panel);border-radius:8px;overflow:hidden;position:relative;">
+            <div id="banner-content" style="display:flex;align-items:center;justify-content:center;height:100%;min-height:300px;"></div>
+            <div id="banner-dots" style="position:absolute;bottom:15px;left:0;right:0;display:flex;justify-content:center;gap:8px;"></div>
+            <button onclick="closeBannerModal()" style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.5);border:none;color:white;padding:8px 12px;border-radius:4px;cursor:pointer;">✕ Close</button>
+        </div>
+        <div style="margin-top:15px;text-align:center;">
+            <button onclick="closeBannerModal()" style="background:var(--accent);border:none;color:white;padding:10px 30px;border-radius:4px;cursor:pointer;font-size:14px;">OK, got it!</button>
         </div>
     </div>
 
@@ -588,6 +618,9 @@
         let itemViewMode = 'form';
         let sidePanelVisible = true;
         const CACHE_KEY = 'json_transform_cache';
+        let bannerImages = [];
+        let currentBannerIndex = 0;
+        let bannerInterval = null;
 
         require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
         require(['vs/editor/editor.main'], function () {
@@ -609,6 +642,7 @@
                 const lastProj = localStorage.getItem('last_active_resource');
                 if (lastProj) loadProject(lastProj);
             });
+            loadBanners();
         });
 
         async function refreshProjectList() {
@@ -638,6 +672,68 @@
             document.getElementById('new-proj-input').value = '';
             await refreshProjectList();
             loadProject(name);
+        }
+
+        async function loadBanners() {
+            const modal = document.getElementById('banner-modal');
+            const content = document.getElementById('banner-content');
+            const dots = document.getElementById('banner-dots');
+            
+            try {
+                const res = await fetch('/api/v1/banners');
+                bannerImages = await res.json();
+            } catch {
+                bannerImages = [];
+            }
+            
+            if (bannerImages.length === 0) {
+                content.innerHTML = `
+                    <div style="padding:40px;text-align:center;max-width:600px;">
+                        <div style="font-size:48px;margin-bottom:20px;">🚀</div>
+                        <h2 style="color:white;margin-bottom:15px;">Welcome to Quick Mock API</h2>
+                        <p style="color:#aaa;line-height:1.8;">
+                            This application is designed to make mocking APIs as fast as possible.<br>
+                            You can perform CRUD operations on resources, create custom functions,<br>
+                            and test them all in one place.
+                        </p>
+                        <p style="color:#888;margin-top:20px;font-size:12px;">
+                            Start by creating a resource in the sidebar or go to <a href="/functions" style="color:var(--accent);">⚡ Functions</a> to create custom functions.
+                        </p>
+                    </div>
+                `;
+                dots.innerHTML = '<div class="banner-dot active"></div>';
+                modal.style.display = 'flex';
+                return;
+            }
+            
+            showBanner(0);
+            modal.style.display = 'flex';
+            startBannerSlideshow();
+        }
+
+        function showBanner(index) {
+            currentBannerIndex = index;
+            const content = document.getElementById('banner-content');
+            const dots = document.getElementById('banner-dots');
+            
+            content.innerHTML = `<img src="${bannerImages[index]}" alt="Banner ${index + 1}" style="max-width:100%;max-height:400px;">`;
+            
+            dots.innerHTML = bannerImages.map((_, i) => 
+                `<div class="banner-dot ${i === index ? 'active' : ''}" onclick="showBanner(${i})"></div>`
+            ).join('');
+        }
+
+        function startBannerSlideshow() {
+            if (bannerInterval) clearInterval(bannerInterval);
+            bannerInterval = setInterval(() => {
+                currentBannerIndex = (currentBannerIndex + 1) % bannerImages.length;
+                showBanner(currentBannerIndex);
+            }, 5000);
+        }
+
+        function closeBannerModal() {
+            if (bannerInterval) clearInterval(bannerInterval);
+            document.getElementById('banner-modal').style.display = 'none';
         }
 
         async function deleteProject(name) {

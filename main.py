@@ -429,6 +429,35 @@ async def run_function(name: str, params: Dict = Body(default={})):
     return {"result": result}
 
 
+# --- BANNER ROUTES ---
+
+BANNER_DIR = "./data/banner-images"
+
+
+@app.get("/api/v1/banners")
+async def get_banners():
+    if not os.path.exists(BANNER_DIR):
+        return []
+    images = sorted(
+        [
+            f
+            for f in os.listdir(BANNER_DIR)
+            if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp"))
+        ]
+    )
+    return [f"/banner-images/{img}" for img in images]
+
+
+@app.get("/banner-images/{filename}")
+async def serve_banner_image(filename: str):
+    from fastapi.responses import FileResponse
+
+    path = os.path.join(BANNER_DIR, filename)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Image not found")
+    return FileResponse(path)
+
+
 # --- CLEAN CRUD ROUTES ---
 
 
