@@ -1,0 +1,15 @@
+{
+    "name": "calculate_total_purchase",
+    "description": "Calculate total purchase of product",
+    "params": [
+        {
+            "name": "required",
+            "required": true
+        }
+    ],
+    "resources": [
+        "restaurant_booking",
+        "product_warehouse"
+    ],
+    "body": "# Set result to return value\nprint(\"hello world\")\nimport json\nresult = json.dumps(data)"
+}

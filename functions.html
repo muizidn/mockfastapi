@@ -73,7 +73,8 @@
         .func-item.active { background: #37373d; border-left: 3px solid var(--accent); }
         .func-name { font-weight: bold; margin-bottom: 4px; }
         .func-desc { font-size: 11px; color: #888; }
-        #content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        #content { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        #empty-state { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
         #editor-section { flex: 1; display: flex; flex-direction: column; padding: 15px; gap: 15px; overflow: auto; }
         #code-editor { height: 300px; border: 1px solid var(--border); }
         .form-group { display: flex; flex-direction: column; gap: 5px; }
@@ -177,7 +178,15 @@
             <div id="func-list"></div>
         </div>
         <div id="content">
-            <div id="editor-section">
+            <div id="empty-state" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;color:#666;">
+                <div style="font-size:48px;opacity:0.3;">⚡</div>
+                <div style="text-align:center;">
+                    <div style="font-size:18px;margin-bottom:10px;">No Function Selected</div>
+                    <div style="font-size:13px;">Create a new function or select one from the sidebar to edit</div>
+                </div>
+                <button onclick="openNewFuncModal()" class="btn-green" style="font-size:14px;padding:10px 20px;">+ Create Function</button>
+            </div>
+            <div id="editor-section" style="display:none;">
                 <div class="form-group">
                     <label>Description</label>
                     <input type="text" id="func-desc" placeholder="Function description" onchange="markDirty()">
@@ -237,12 +246,8 @@
             monacoReady = true;
             loadFunctions();
             loadResources();
+            hideEditor();
         });
-
-        window.onerror = function(msg, url, line, col, error) {
-            console.error('Error:', msg, 'at line', line);
-            return false;
-        };
 
         async function loadFunctions() {
             const res = await fetch('/api/v1/functions');
@@ -292,6 +297,7 @@
             renderTestParams();
             isDirty = false;
             renderFuncList();
+            showEditor();
         }
 
         function renderParams() {
@@ -350,6 +356,16 @@
             isDirty = true;
         }
 
+        function showEditor() {
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('editor-section').style.display = 'flex';
+        }
+
+        function hideEditor() {
+            document.getElementById('empty-state').style.display = 'flex';
+            document.getElementById('editor-section').style.display = 'none';
+        }
+
         function openNewFuncModal() {
             document.getElementById('modal').style.display = 'flex';
             document.getElementById('new-func-name').value = '';
@@ -386,25 +402,18 @@
         }
 
         async function saveFunction() {
-            console.log('saveFunction called');
-            if (!currentFunc) {
-                console.log('No currentFunc');
-                return;
-            }
+            if (!currentFunc) return;
             
             currentFunc.description = document.getElementById('func-desc').value;
             currentFunc.params = params;
             currentFunc.resources = selectedResources;
             currentFunc.body = editor.getValue();
             
-            console.log('Saving:', currentFunc);
-            
             const res = await fetch(`/api/v1/functions/${currentFunc.name}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(currentFunc)
             });
-            console.log('Response:', res);
             
             if (res.ok) {
                 document.getElementById('status').innerText = '✅ Saved ' + new Date().toLocaleTimeString();
@@ -417,15 +426,10 @@
         }
 
         async function deleteFunction() {
-            console.log('deleteFunction called');
-            if (!currentFunc) {
-                console.log('No currentFunc');
-                return;
-            }
+            if (!currentFunc) return;
             if (!confirm(`Delete function ${currentFunc.name}?`)) return;
             
             const res = await fetch(`/api/v1/functions/${currentFunc.name}`, { method: 'DELETE' });
-            console.log('Response:', res);
             
             if (res.ok) {
                 currentFunc = null;
@@ -437,15 +441,12 @@
                 renderTestParams();
                 await loadFunctions();
                 document.getElementById('status').innerText = 'Deleted';
+                hideEditor();
             }
         }
 
         async function runFunction() {
-            console.log('runFunction called');
-            if (!currentFunc) {
-                console.log('No currentFunc');
-                return;
-            }
+            if (!currentFunc) return;
             
             const testParams = {};
             params.forEach(p => {
@@ -459,7 +460,6 @@
                 }
             });
             
-            console.log('Params:', testParams);
             document.getElementById('test-result').innerText = 'Running...';
             
             const res = await fetch(`/api/v1/functions/${currentFunc.name}/run`, {
@@ -467,10 +467,8 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(testParams)
             });
-            console.log('Response:', res);
             
             const data = await res.json();
-            console.log('Data:', data);
             
             if (res.ok) {
                 document.getElementById('test-result').innerText = JSON.stringify(data.result, null, 2);
