@@ -784,6 +784,36 @@ async def test_function(name: str, params: Dict = Body(default={})):
     return result
 
 
+
+# --- SCHEMA ROUTES ---
+
+
+@app.get("/api/v1/r/{resource}/schema")
+async def get_schema(resource: str):
+    schema = get_resource_schema(resource)
+    if schema is None:
+        raise HTTPException(
+            status_code=404, detail="No schema defined for this resource"
+        )
+    return schema
+
+
+@app.put("/api/v1/r/{resource}/schema")
+async def set_schema(resource: str, schema: Dict = Body(...)):
+    try:
+        jsonschema.Draft7Validator.check_schema(schema)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid schema: {e}")
+    save_resource_schema(resource, schema)
+    return {"status": "ok"}
+
+
+@app.delete("/api/v1/r/{resource}/schema")
+async def delete_schema(resource: str):
+    delete_resource_schema(resource)
+    return {"status": "ok"}
+
+
 # --- CLEAN CRUD ROUTES ---
 
 
@@ -881,35 +911,6 @@ async def delete_item(resource: str, item_id: str):
     new_data = [item for item in data if str(item.get("id")) != item_id]
     save_resource_data(resource, new_data)
     return {"message": "Deleted"}
-
-
-# --- SCHEMA ROUTES ---
-
-
-@app.get("/api/v1/r/{resource}/schema")
-async def get_schema(resource: str):
-    schema = get_resource_schema(resource)
-    if schema is None:
-        raise HTTPException(
-            status_code=404, detail="No schema defined for this resource"
-        )
-    return schema
-
-
-@app.put("/api/v1/r/{resource}/schema")
-async def set_schema(resource: str, schema: Dict = Body(...)):
-    try:
-        jsonschema.Draft7Validator.check_schema(schema)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid schema: {e}")
-    save_resource_schema(resource, schema)
-    return {"status": "ok"}
-
-
-@app.delete("/api/v1/r/{resource}/schema")
-async def delete_schema(resource: str):
-    delete_resource_schema(resource)
-    return {"status": "ok"}
 
 
 # --- BANNER ROUTES ---

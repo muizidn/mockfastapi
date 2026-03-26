@@ -99,6 +99,8 @@ make up
 - **Schemas**: Store in `data/schema/{resource}.json`
 - **Functions**: Store in `data/functions/{name}.json` (ONE FILE PER FUNCTION)
 - **DO NOT use**: `data/functions.json` (legacy, should not exist)
+- **Testing**: Do not remove any `data/*json` or `data/*db` files for your testing or debugging purpose. See testing section
+
 
 ### 2. Route Order
 **IMPORTANT**: More specific routes MUST come before generic routes!
@@ -157,6 +159,11 @@ pkill -f uvicorn
 **Solution**: Check route order - specific routes must come before generic `{resource}` routes
 
 ## Testing
+
+### Testing RULE
+
+Don't remove any Existing *json file in the data. 
+If you need to test a resource or function create new one for the testing purpose
 
 ### Manual Testing
 ```bash
