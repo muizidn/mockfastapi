@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Functions</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+    <style>
+        :root {
+            --bg: #1e1e1e;
+            --panel: #252526;
+            --sidebar: #333333;
+            --accent: #007acc;
+            --border: #444;
+        }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: #cccccc;
+        }
+        #toolbar {
+            height: 40px;
+            padding: 0 20px;
+            background: var(--panel);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+        button:hover { filter: brightness(1.2); }
+        .btn-green { background: #28a745; }
+        .btn-red { background: #dc3545; }
+        .btn-purple { background: #6f42c1; }
+        input, textarea, select {
+            background: #3c3c3c;
+            color: white;
+            border: 1px solid var(--border);
+            padding: 6px 8px;
+            border-radius: 2px;
+            font-size: 13px;
+        }
+        #main { display: flex; height: calc(100vh - 40px); }
+        #sidebar {
+            width: 280px;
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+        #sidebar-header {
+            padding: 12px;
+            background: #2d2d2d;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #666;
+            border-bottom: 1px solid var(--border);
+        }
+        #func-list { flex: 1; overflow-y: auto; }
+        .func-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+        }
+        .func-item:hover { background: #2a2d2e; }
+        .func-item.active { background: #37373d; border-left: 3px solid var(--accent); }
+        .func-name { font-weight: bold; margin-bottom: 4px; }
+        .func-desc { font-size: 11px; color: #888; }
+        #content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        #editor-section { flex: 1; display: flex; flex-direction: column; padding: 15px; gap: 15px; overflow: auto; }
+        #code-editor { height: 300px; border: 1px solid var(--border); }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .form-group label { font-size: 12px; color: #888; }
+        .form-row { display: flex; gap: 10px; align-items: center; }
+        .param-item {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 5px;
+            background: #2d2d2d;
+            border-radius: 2px;
+            margin-bottom: 5px;
+        }
+        .param-item input { flex: 1; }
+        #params-list { max-height: 150px; overflow-y: auto; }
+        .test-section {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 15px;
+        }
+        .test-section h3 { margin: 0 0 15px 0; font-size: 14px; }
+        #test-result {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 2px;
+            max-height: 200px;
+            overflow: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        #modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        #modal > div {
+            background: var(--panel);
+            padding: 20px;
+            border-radius: 4px;
+            width: 500px;
+            max-height: 80vh;
+            overflow: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        .modal-header h3 { margin: 0; }
+        .resource-item {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 4px 0;
+        }
+        .resource-item input { width: 200px; }
+        .resource-list { max-height: 120px; overflow-y: auto; background: #2d2d2d; padding: 10px; border-radius: 2px; }
+        .status-msg { font-size: 11px; color: #888; margin-left: auto; }
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <a href="/" style="color: var(--accent); text-decoration: none; font-weight: bold;">← Back to IDE</a>
+        <button onclick="openNewFuncModal()" class="btn-green">+ New Function</button>
+        <button onclick="saveFunction()" id="save-btn" class="btn-green">Save</button>
+        <button onclick="deleteFunction()" id="delete-btn" class="btn-red">Delete</button>
+        <span id="status" class="status-msg"></span>
+    </div>
+
+    <div id="modal">
+        <div>
+            <div class="modal-header">
+                <h3>New Function</h3>
+                <button onclick="closeModal()" style="background:#444;">✕</button>
+            </div>
+            <div class="form-group">
+                <label>Function Name</label>
+                <input type="text" id="new-func-name" placeholder="my_function">
+            </div>
+            <div class="form-group" style="margin-top: 15px;">
+                <label>Description</label>
+                <input type="text" id="new-func-desc" placeholder="What this function does">
+            </div>
+            <div style="margin-top: 15px; display: flex; gap: 10px;">
+                <button onclick="createFunction()" class="btn-green" style="flex:1;">Create</button>
+                <button onclick="closeModal()" style="flex:1; background:#666;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="main">
+        <div id="sidebar">
+            <div id="sidebar-header">Functions</div>
+            <div id="func-list"></div>
+        </div>
+        <div id="content">
+            <div id="editor-section">
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" id="func-desc" placeholder="Function description" onchange="markDirty()">
+                </div>
+                
+                <div class="form-group">
+                    <label>Parameters (add key, mark required with *)</label>
+                    <div id="params-list"></div>
+                    <div style="display:flex;gap:10px;margin-top:10px;">
+                        <input type="text" id="new-param-key" placeholder="param_name">
+                        <input type="checkbox" id="new-param-required"> Required
+                        <button onclick="addParam()" style="background:#28a745;">+ Add</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Resources (data available as data.resource_name)</label>
+                    <div class="resource-list" id="resource-checkboxes"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Function Body (set result = ... to return)</label>
+                    <div id="code-editor"></div>
+                </div>
+
+                <div class="test-section">
+                    <h3>Test Function</h3>
+                    <div id="test-params"></div>
+                    <div style="display:flex;gap:10px;margin:15px 0;">
+                        <button onclick="runFunction()" class="btn-purple">Run</button>
+                    </div>
+                    <div id="test-result">Results will appear here...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let editor;
+        let functions = [];
+        let currentFunc = null;
+        let params = [];
+        let selectedResources = [];
+        let isDirty = false;
+
+        require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
+        require(['vs/editor/editor.main'], function () {
+            editor = monaco.editor.create(document.getElementById('code-editor'), {
+                value: '# Set result to return value\nresult = data',
+                language: 'python',
+                theme: 'vs-dark',
+                automaticLayout: true,
+                fontSize: 13
+            });
+            editor.onDidChangeModelContent(() => markDirty());
+            loadFunctions();
+            loadResources();
+        });
+
+        async function loadFunctions() {
+            const res = await fetch('/api/v1/functions');
+            functions = await res.json();
+            renderFuncList();
+        }
+
+        async function loadResources() {
+            const res = await fetch('/api/v1/resources');
+            const resources = await res.json();
+            document.getElementById('resource-checkboxes').innerHTML = resources.map(r => `
+                <div class="resource-item">
+                    <input type="checkbox" id="res-${r}" onchange="toggleResource('${r}')">
+                    <label for="res-${r}">${r}</label>
+                </div>
+            `).join('');
+        }
+
+        function renderFuncList() {
+            document.getElementById('func-list').innerHTML = functions.map(f => `
+                <div class="func-item ${f.name === currentFunc?.name ? 'active' : ''}" onclick="loadFunction('${f.name}')">
+                    <div class="func-name">${f.name}</div>
+                    <div class="func-desc">${f.description || 'No description'}</div>
+                </div>
+            `).join('');
+        }
+
+        async function loadFunction(name) {
+            if (isDirty && !confirm('Discard unsaved changes?')) return;
+            
+            const res = await fetch(`/api/v1/functions/${name}`);
+            if (!res.ok) return;
+            
+            currentFunc = await res.json();
+            params = [...(currentFunc.params || [])];
+            selectedResources = [...(currentFunc.resources || [])];
+            
+            document.getElementById('func-desc').value = currentFunc.description || '';
+            editor.setValue(currentFunc.body || '# Set result to return value\nresult = data');
+            
+            renderParams();
+            selectedResources.forEach(r => {
+                const cb = document.getElementById(`res-${r}`);
+                if (cb) cb.checked = true;
+            });
+            
+            renderTestParams();
+            isDirty = false;
+            renderFuncList();
+        }
+
+        function renderParams() {
+            document.getElementById('params-list').innerHTML = params.map((p, i) => `
+                <div class="param-item">
+                    <span style="color:${p.required ? '#dc3545' : '#888'}">${p.required ? '*' : ''}${p.name}</span>
+                    <button onclick="removeParam(${i})" style="background:#dc3545;padding:2px 8px;">×</button>
+                </div>
+            `).join('');
+        }
+
+        function addParam() {
+            const key = document.getElementById('new-param-key').value.trim();
+            if (!key) return;
+            const required = document.getElementById('new-param-required').checked;
+            params.push({ name: key, required });
+            document.getElementById('new-param-key').value = '';
+            document.getElementById('new-param-required').checked = false;
+            renderParams();
+            renderTestParams();
+            markDirty();
+        }
+
+        function removeParam(idx) {
+            params.splice(idx, 1);
+            renderParams();
+            renderTestParams();
+            markDirty();
+        }
+
+        function toggleResource(name) {
+            const idx = selectedResources.indexOf(name);
+            if (idx > -1) {
+                selectedResources.splice(idx, 1);
+            } else {
+                selectedResources.push(name);
+            }
+            markDirty();
+        }
+
+        function renderTestParams() {
+            const container = document.getElementById('test-params');
+            if (params.length === 0) {
+                container.innerHTML = '<div style="color:#888;font-size:12px;">No parameters defined</div>';
+                return;
+            }
+            container.innerHTML = params.map(p => `
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>${p.name}${p.required ? ' *' : ''}</label>
+                    <input type="text" id="test-param-${p.name}" placeholder="Enter value">
+                </div>
+            `).join('');
+        }
+
+        function markDirty() {
+            isDirty = true;
+        }
+
+        function openNewFuncModal() {
+            document.getElementById('modal').style.display = 'flex';
+            document.getElementById('new-func-name').value = '';
+            document.getElementById('new-func-desc').value = '';
+        }
+
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+
+        async function createFunction() {
+            const name = document.getElementById('new-func-name').value.trim();
+            const desc = document.getElementById('new-func-desc').value.trim();
+            
+            if (!name) {
+                alert('Function name required');
+                return;
+            }
+            
+            const res = await fetch('/api/v1/functions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, description: desc, params: [], resources: [], body: '# Set result to return value\nresult = data' })
+            });
+            
+            if (res.ok) {
+                closeModal();
+                await loadFunctions();
+                loadFunction(name);
+            } else {
+                const err = await res.json();
+                alert(err.detail);
+            }
+        }
+
+        async function saveFunction() {
+            if (!currentFunc) return;
+            
+            currentFunc.description = document.getElementById('func-desc').value;
+            currentFunc.params = params;
+            currentFunc.resources = selectedResources;
+            currentFunc.body = editor.getValue();
+            
+            const res = await fetch(`/api/v1/functions/${currentFunc.name}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(currentFunc)
+            });
+            
+            if (res.ok) {
+                document.getElementById('status').innerText = '✅ Saved ' + new Date().toLocaleTimeString();
+                isDirty = false;
+                await loadFunctions();
+            } else {
+                const err = await res.json();
+                document.getElementById('status').innerText = '❌ ' + err.detail;
+            }
+        }
+
+        async function deleteFunction() {
+            if (!currentFunc) return;
+            if (!confirm(`Delete function ${currentFunc.name}?`)) return;
+            
+            const res = await fetch(`/api/v1/functions/${currentFunc.name}`, { method: 'DELETE' });
+            
+            if (res.ok) {
+                currentFunc = null;
+                params = [];
+                selectedResources = [];
+                document.getElementById('func-desc').value = '';
+                editor.setValue('# Set result to return value\nresult = data');
+                renderParams();
+                renderTestParams();
+                await loadFunctions();
+                document.getElementById('status').innerText = 'Deleted';
+            }
+        }
+
+        async function runFunction() {
+            if (!currentFunc) return;
+            
+            const testParams = {};
+            params.forEach(p => {
+                const input = document.getElementById(`test-param-${p.name}`);
+                if (input && input.value) {
+                    try {
+                        testParams[p.name] = JSON.parse(input.value);
+                    } catch {
+                        testParams[p.name] = input.value;
+                    }
+                }
+            });
+            
+            document.getElementById('test-result').innerText = 'Running...';
+            
+            const res = await fetch(`/api/v1/functions/${currentFunc.name}/run`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(testParams)
+            });
+            
+            const data = await res.json();
+            
+            if (res.ok) {
+                document.getElementById('test-result').innerText = JSON.stringify(data.result, null, 2);
+                document.getElementById('test-result').style.color = '#9cdcfe';
+            } else {
+                document.getElementById('test-result').innerText = data.detail || 'Error';
+                document.getElementById('test-result').style.color = '#ff6b6b';
+            }
+        }
+    </script>
+</body>
+</html>

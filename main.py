@@ -10,15 +10,19 @@ import re
 import operator
 import jsonschema
 from jsonschema import ValidationError
+import traceback
 
 app = FastAPI(title="JSON Project IDE")
 DATA_DIR = "./data"
 SCHEMA_DIR = "./data/schema"
+FUNCTIONS_DIR = "./data/functions"
 
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 if not os.path.exists(SCHEMA_DIR):
     os.makedirs(SCHEMA_DIR)
+if not os.path.exists(FUNCTIONS_DIR):
+    os.makedirs(FUNCTIONS_DIR)
 
 # --- FILTER ENGINE ---
 
@@ -414,6 +418,143 @@ async def set_schema(resource: str, schema: Dict = Body(...)):
 async def delete_schema(resource: str):
     delete_resource_schema(resource)
     return {"status": "ok"}
+
+
+# --- FUNCTION ROUTES ---
+
+
+def get_function(name: str) -> Optional[Dict]:
+    path = os.path.join(FUNCTIONS_DIR, f"{name}.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return None
+
+
+def save_function(name: str, func_data: Dict):
+    path = os.path.join(FUNCTIONS_DIR, f"{name}.json")
+    with open(path, "w") as f:
+        json.dump(func_data, f, indent=4)
+
+
+def remove_function_file(name: str):
+    path = os.path.join(FUNCTIONS_DIR, f"{name}.json")
+    if os.path.exists(path):
+        os.remove(path)
+
+
+def execute_function(func_data: Dict, params: Dict) -> Any:
+    body = func_data.get("body", "")
+    resources = func_data.get("resources", [])
+
+    available_data = {}
+    for res in resources:
+        available_data[res] = get_resource_data(res)
+
+    try:
+        func_code = compile(body, "<string>", "exec")
+        func_globals = {
+            "data": available_data,
+            "params": params,
+            "result": None,
+        }
+        exec(func_code, func_globals)
+        return func_globals.get("result")
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Execution error: {str(e)}\n{traceback.format_exc()}",
+        )
+
+
+@app.get("/api/v1/functions")
+async def list_functions():
+    files = glob.glob(os.path.join(FUNCTIONS_DIR, "*.json"))
+    funcs = []
+    for f in files:
+        name = os.path.basename(f).replace(".json", "")
+        func_data = get_function(name)
+        if func_data:
+            funcs.append(
+                {
+                    "name": name,
+                    "description": func_data.get("description", ""),
+                    "params": func_data.get("params", []),
+                    "resources": func_data.get("resources", []),
+                }
+            )
+    return funcs
+
+
+@app.post("/api/v1/functions")
+async def create_function(func: Dict = Body(...)):
+    name = func.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Function name is required")
+    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name):
+        raise HTTPException(status_code=400, detail="Invalid function name")
+    if get_function(name):
+        raise HTTPException(status_code=400, detail="Function already exists")
+
+    func_data = {
+        "name": name,
+        "description": func.get("description", ""),
+        "params": func.get("params", []),
+        "resources": func.get("resources", []),
+        "body": func.get("body", ""),
+    }
+    save_function(name, func_data)
+    return {"status": "ok", "name": name}
+
+
+@app.get("/api/v1/functions/{name}")
+async def get_function_details(name: str):
+    func_data = get_function(name)
+    if not func_data:
+        raise HTTPException(status_code=404, detail="Function not found")
+    return func_data
+
+
+@app.put("/api/v1/functions/{name}")
+async def update_function(name: str, func: Dict = Body(...)):
+    if not get_function(name):
+        raise HTTPException(status_code=404, detail="Function not found")
+
+    func_data = {
+        "name": name,
+        "description": func.get("description", ""),
+        "params": func.get("params", []),
+        "resources": func.get("resources", []),
+        "body": func.get("body", ""),
+    }
+    save_function(name, func_data)
+    return {"status": "ok"}
+
+
+@app.delete("/api/v1/functions/{name}")
+async def delete_func(name: str):
+    if not get_function(name):
+        raise HTTPException(status_code=404, detail="Function not found")
+    remove_function_file(name)
+    return {"status": "ok"}
+
+
+@app.post("/api/v1/functions/{name}/run")
+async def run_function(name: str, params: Dict = Body(default={})):
+    func_data = get_function(name)
+    if not func_data:
+        raise HTTPException(status_code=404, detail="Function not found")
+
+    result = execute_function(func_data, params)
+    return {"result": result}
+
+
+@app.get("/functions")
+async def functions_ui():
+    return FileResponse("functions.html")
 
 
 @app.get("/")

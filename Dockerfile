@@ -14,10 +14,11 @@ RUN uv pip install --system -r requirements.txt
 # Copy the backend code and the UI
 COPY main.py .
 COPY index.html .
+COPY functions.html .
 
 # Create the data and schema directories (it will be overridden by the volume,
 # but this ensures correct permissions)
-RUN mkdir -p /app/data /app/data/schema
+RUN mkdir -p /app/data /app/data/schema /app/data/functions
 
 # Expose the port FastAPI runs on
 EXPOSE 8000
