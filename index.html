@@ -527,6 +527,10 @@
                 <input type="text" id="new-proj-input" placeholder="resource_name..." style="width:100%;">
                 <button onclick="createNewProject()">+</button>
             </div>
+            <div style="padding:8px;">
+                <input type="text" id="resource-search" placeholder="Search resources..." 
+                       style="width:100%;" oninput="filterResources(this.value)">
+            </div>
             <div id="resource-list"></div>
         </div>
 
@@ -622,6 +626,7 @@
         let bannerImages = [];
         let currentBannerIndex = 0;
         let bannerInterval = null;
+        let schemaCache = {};
 
         require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
         require(['vs/editor/editor.main'], function () {
@@ -650,16 +655,26 @@
             try {
                 const res = await fetch('/api/v1/resources');
                 const resources = await res.json();
-                document.getElementById('resource-list').innerHTML = resources.map(p => `
-                    <div class="resource-item ${p === activeProject ? 'active' : ''}" onclick="loadProject('${p}')">
-                        <span>${p}.json</span>
-                        <div class="item-actions">
-                            <a href="/docs/${p}" target="_blank" class="action-link" onclick="event.stopPropagation()">DOCS</a>
-                            <span class="btn-del" onclick="event.stopPropagation(); deleteProject('${p}')">×</span>
-                        </div>
-                    </div>
-                `).join('');
+                window.allResources = resources;
+                filterResources(document.getElementById('resource-search').value);
             } catch (e) { console.error(e); }
+        }
+
+        function filterResources(query) {
+            const resources = window.allResources || [];
+            const filtered = query 
+                ? resources.filter(r => r.toLowerCase().includes(query.toLowerCase()))
+                : resources;
+            
+            document.getElementById('resource-list').innerHTML = filtered.map(p => `
+                <div class="resource-item ${p === activeProject ? 'active' : ''}" onclick="loadProject('${p}')">
+                    <span>${p}.json</span>
+                    <div class="item-actions">
+                        <a href="/docs/${p}" target="_blank" class="action-link" onclick="event.stopPropagation()">DOCS</a>
+                        <span class="btn-del" onclick="event.stopPropagation(); deleteProject('${p}')">×</span>
+                    </div>
+                </div>
+            `).join('');
         }
 
         async function createNewProject() {
@@ -770,7 +785,6 @@
 
             refreshProjectList();
             runTransform();
-            checkSchema();
         }
 
         async function refreshData() {
@@ -1020,19 +1034,28 @@
             return data;
         }
 
-        function validateItemData(data) {
-            const schemaRes = fetch(`/api/v1/r/${activeProject}/schema`).then(r => r.ok ? r.json() : null);
-            return schemaRes.then(schema => {
-                if (!schema) return { valid: true };
+        async function validateItemData(data) {
+            let schema = schemaCache[activeProject];
+            
+            if (!schema) {
                 try {
-                    const Ajv = window.ajv || (window.ajv = new Function('return ' + fetch('https://cdn.jsdelivr.net/npm/ajv@8/dist/ajv.bundle.min.js').then(r => r.text()).then(code => eval(code)))());
-                    const validate = new Function('schema', 'data', `return ${code};`)();
-                    if (!validate(data)) {
-                        return { valid: false, error: JSON.stringify(validate.errors, null, 2) };
+                    const res = await fetch(`/api/v1/r/${activeProject}/schema`);
+                    if (res.ok) {
+                        schema = await res.json();
+                        schemaCache[activeProject] = schema;
                     }
                 } catch { }
-                return { valid: true };
-            });
+            }
+            
+            if (!schema) return { valid: true };
+            try {
+                const Ajv = window.ajv || (window.ajv = new Function('return ' + fetch('https://cdn.jsdelivr.net/npm/ajv@8/dist/ajv.bundle.min.js').then(r => r.text()).then(code => eval(code)))());
+                const validate = new Function('schema', 'data', `return ${code};`)();
+                if (!validate(data)) {
+                    return { valid: false, error: JSON.stringify(validate.errors, null, 2) };
+                }
+            } catch { }
+            return { valid: true };
         }
 
         async function saveItem() {
@@ -1243,6 +1266,8 @@
                     loadSchema();
                 });
             } else { loadSchema(); }
+            
+            checkSchema();
         }
 
         function closeSchemaModal() {
