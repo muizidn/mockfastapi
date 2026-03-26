@@ -516,7 +516,16 @@ async def run_function(name: str, params: Dict = Body(default={})):
     if not func_data:
         raise HTTPException(status_code=404, detail="Function not found")
     result = execute_function(func_data, params)
-    return {"result": result}
+    return result
+
+
+@app.post("/api/v1/functions/{name}/test")
+async def test_function(name: str, params: Dict = Body(default={})):
+    func_data = get_function(name)
+    if not func_data:
+        raise HTTPException(status_code=404, detail="Function not found")
+    result = execute_function(func_data, params)
+    return result
 
 
 # --- BANNER ROUTES ---

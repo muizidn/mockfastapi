@@ -568,7 +568,7 @@ result = items</code></pre>
                 }
             });
             
-            const res = await fetch(`/api/v1/functions/${currentFunc.name}/run`, {
+            const res = await fetch(`/api/v1/functions/${currentFunc.name}/test`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(testParams)
@@ -578,16 +578,16 @@ result = items</code></pre>
             
             if (res.ok) {
                 document.getElementById('test-error').style.display = 'none';
-                document.getElementById('test-logs').innerText = data.logs && data.logs.length > 0 
-                    ? data.logs.join('\n') 
-                    : '(no logs)';
+                if (data.logs && data.logs.length > 0) {
+                    document.getElementById('test-logs').innerText = data.logs.join('\n');
+                } else {
+                    document.getElementById('test-logs').innerText = '(no logs)';
+                }
                 document.getElementById('test-result').innerText = JSON.stringify(data.result, null, 2);
             } else {
                 document.getElementById('test-error').style.display = 'block';
                 document.getElementById('test-error-content').innerText = data.detail || 'Unknown error';
-                document.getElementById('test-logs').innerText = data.detail?.includes('Logs:') 
-                    ? data.detail.split('❌ Error:')[0].replace('Logs:\n', '') 
-                    : '(no logs)';
+                document.getElementById('test-logs').innerText = '(error occurred)';
                 document.getElementById('test-result').innerText = '(error occurred)';
             }
         }
