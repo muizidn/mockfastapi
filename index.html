@@ -297,7 +297,8 @@
         }
 
         #schema-modal,
-        #item-modal {
+        #item-modal,
+        #error-modal {
             display: none;
             position: fixed;
             top: 0;
@@ -311,7 +312,8 @@
         }
 
         #schema-modal>div,
-        #item-modal>div {
+        #item-modal>div,
+        #error-modal>div {
             background: var(--panel);
             padding: 20px;
             border-radius: 4px;
@@ -320,6 +322,48 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
+        }
+
+        #error-modal>div {
+            width: 800px;
+            border: 2px solid #dc3545;
+        }
+
+        .error-item {
+            background: rgba(220, 53, 69, 0.1);
+            border: 1px solid #dc3545;
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+
+        .error-item-header {
+            font-weight: bold;
+            color: #dc3545;
+            margin-bottom: 8px;
+        }
+
+        .error-item-details {
+            font-size: 13px;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .error-item pre {
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 11px;
+            margin: 5px 0 0 0;
+        }
+
+        .json-highlight {
+            background: #dc3545;
+            color: white;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: bold;
         }
 
         .modal-header {
@@ -488,6 +532,20 @@
             <button onclick="closeBannerModal()"
                 style="background:var(--accent);border:none;color:white;padding:10px 30px;border-radius:4px;cursor:pointer;font-size:14px;">OK,
                 got it!</button>
+        </div>
+    </div>
+
+    <div id="error-modal">
+        <div>
+            <div class="modal-header">
+                <h3>⚠️ Validation Error</h3>
+                <button onclick="closeErrorModal()" style="background:#444;">✕</button>
+            </div>
+            <div id="error-modal-message" style="color: #dc3545; font-weight: bold;"></div>
+            <div id="error-modal-body" class="modal-body"></div>
+            <div class="modal-footer">
+                <button onclick="closeErrorModal()" style="background:#6c757d;">Close</button>
+            </div>
         </div>
     </div>
 
@@ -766,6 +824,90 @@
         function closeBannerModal() {
             if (bannerInterval) clearInterval(bannerInterval);
             document.getElementById('banner-modal').style.display = 'none';
+        }
+
+        function closeErrorModal() {
+            document.getElementById('error-modal').style.display = 'none';
+        }
+
+        function showErrorModal(errorData) {
+            const modal = document.getElementById('error-modal');
+            const messageEl = document.getElementById('error-modal-message');
+            const bodyEl = document.getElementById('error-modal-body');
+
+            if (typeof errorData === 'string') {
+                messageEl.innerText = errorData;
+                bodyEl.innerHTML = '';
+            } else {
+                messageEl.innerText = errorData.message || 'Validation Error';
+                bodyEl.innerHTML = '';
+
+                if (errorData.errors && Array.isArray(errorData.errors)) {
+                    errorData.errors.forEach((err, idx) => {
+                        const itemDiv = document.createElement('div');
+                        itemDiv.className = 'error-item';
+
+                        let itemHtml = `<div class="error-item-header">Error #${idx + 1}: ${err.message || 'Unknown error'}</div>`;
+                        itemHtml += `<div class="error-item-details">`;
+                        if (err.field) itemHtml += `<div><strong>Field:</strong> ${err.field}</div>`;
+                        if (err.validator) itemHtml += `<div><strong>Validator:</strong> ${err.validator}</div>`;
+                        if (err.path && err.path.length) itemHtml += `<div><strong>Path:</strong> ${err.path.join('.')}</div>`;
+                        if (err.index !== undefined) itemHtml += `<div><strong>Index:</strong> ${err.index}</div>`;
+                        itemHtml += `</div>`;
+
+                        if (err.item) {
+                            const highlightedJson = highlightJsonPath(err.item, err.path);
+                            itemHtml += `<pre>${highlightedJson}</pre>`;
+                        }
+
+                        itemDiv.innerHTML = itemHtml;
+                        bodyEl.appendChild(itemDiv);
+                    });
+                } else {
+                    bodyEl.innerHTML = `<pre>${JSON.stringify(errorData, null, 2)}</pre>`;
+                }
+            }
+
+            modal.style.display = 'flex';
+        }
+
+        function highlightJsonPath(obj, path) {
+            if (!path || !path.length) return escapeHtml(JSON.stringify(obj, null, 2));
+
+            const json = JSON.stringify(obj, null, 2);
+            const targetField = path[0];
+            const lines = json.split('\n');
+            const result = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const indent = line.match(/^(\s*)/)[1];
+                const keyMatch = line.match(/^(\s*)"([^"]+)"\s*:/);
+
+                if (keyMatch && keyMatch[2] === targetField) {
+                    if (path.length === 1) {
+                        result.push(line.replace(
+                            /("([^"]+)"\s*:\s*)(.*)/,
+                            `$1<span class="json-highlight">$3</span>`
+                        ));
+                    } else {
+                        result.push(line.replace(
+                            /("([^"]+)")/,
+                            `<span class="json-highlight">$1</span>`
+                        ));
+                    }
+                } else {
+                    result.push(line);
+                }
+            }
+
+            return result.join('\n');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         async function deleteProject(name) {
@@ -1383,7 +1525,16 @@
 
                 if (res.ok) {
                     document.getElementById('save-btn').innerText = "Save (Ctrl+S)";
-                    document.getElementById('status').innerText = "✅ Saved " + new Date().toLocaleTimeString();
+                    const statusEl = document.getElementById('status');
+                    statusEl.innerText = "✅ Saved " + new Date().toLocaleTimeString();
+                    statusEl.style.background = '';
+                    statusEl.style.color = '#28a745';
+                    statusEl.style.display = '';
+                    statusEl.style.padding = '';
+                    statusEl.style.borderRadius = '';
+                    statusEl.style.border = '';
+                    statusEl.style.cursor = '';
+                    statusEl.onclick = null;
 
                     const filterQuery = document.getElementById('filter-input').value.trim();
                     const [allRes, filteredRes] = await Promise.all([
@@ -1400,13 +1551,18 @@
                     document.getElementById('save-btn').innerText = "Save (Ctrl+S)";
                     const errorMsg = err.detail || 'Save Failed';
                     const statusEl = document.getElementById('status');
-                    statusEl.innerText = "❌ " + errorMsg;
+                    statusEl.innerText = "❌ " + (typeof errorMsg === 'object' ? errorMsg.message : errorMsg);
                     statusEl.style.cursor = 'pointer';
-                    statusEl.style.color = '#dc3545';
+                    statusEl.style.background = '#dc3545';
+                    statusEl.style.color = 'white';
+                    statusEl.style.padding = '6px 12px';
+                    statusEl.style.borderRadius = '4px';
+                    statusEl.style.border = 'none';
+                    statusEl.style.display = 'inline-block';
                     statusEl.title = 'Click to see details';
-                    statusEl.onclick = function () { alert('Save Error:\n\n' + errorMsg); };
+                    statusEl.onclick = function () { showErrorModal(err.detail || errorMsg); };
                     window.lastValidationError = errorMsg;
-                    throw new Error(errorMsg);
+                    throw new Error(typeof errorMsg === 'object' ? errorMsg.message : errorMsg);
                 }
             } catch (e) {
                 document.getElementById('save-btn').innerText = "Save (Ctrl+S)";
@@ -1441,6 +1597,14 @@
                 if (res.ok) {
                     btn.innerText = "Save (Ctrl+S)";
                     status.innerText = "✅ Saved " + new Date().toLocaleTimeString();
+                    status.style.background = '';
+                    status.style.color = '#28a745';
+                    status.style.display = '';
+                    status.style.padding = '';
+                    status.style.borderRadius = '';
+                    status.style.border = '';
+                    status.style.cursor = '';
+                    status.onclick = null;
                     tableData = JSON.parse(content);
                     filteredData = [...tableData];
                     if (currentView === 'table') renderTable();
@@ -1448,11 +1612,16 @@
                     const err = await res.json();
                     btn.innerText = "Save (Ctrl+S)";
                     const errorData = err.detail || 'Save Failed';
-                    status.innerText = "❌ " + errorData.message;
+                    status.innerText = "❌ " + (errorData.message || errorData);
                     status.style.cursor = 'pointer';
-                    status.style.color = '#dc3545';
+                    status.style.background = '#dc3545';
+                    status.style.color = 'white';
+                    status.style.padding = '6px 12px';
+                    status.style.borderRadius = '4px';
+                    status.style.border = 'none';
+                    status.style.display = 'inline-block';
                     status.title = 'Click to see details';
-                    status.onclick = function () { alert('Save Error:\n\n' + JSON.stringify(errorData, null, 2)); };
+                    status.onclick = function () { showErrorModal(errorData); };
                     const structuredErrors = errorData.errors;
                     if (structuredErrors) {
                         highlightEditorErrorsFromBackend(structuredErrors, content);
