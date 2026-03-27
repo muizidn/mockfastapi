@@ -297,8 +297,7 @@
         }
 
         #schema-modal,
-        #item-modal,
-        #error-modal {
+        #item-modal {
             display: none;
             position: fixed;
             top: 0;
@@ -307,6 +306,19 @@
             height: 100%;
             background: rgba(0, 0, 0, 0.7);
             z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #error-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 2000;
             justify-content: center;
             align-items: center;
         }
@@ -579,9 +591,11 @@
                 </div>
                 <div id="form-editor" class="show"></div>
                 <div id="json-editor-container"></div>
-                <div id="item-error" class="json-error" style="display:none; margin-top: 10px;"></div>
             </div>
             <div class="modal-footer">
+                <div id="item-error" class="json-error"
+                    style="display:none; margin-top: 10px; cursor: pointer; background: #dc3545; color: white; padding: 8px 12px; border-radius: 4px; font-weight: bold;"
+                    onclick="showItemErrorModal()"></div>
                 <button onclick="closeItemModal()" style="background:#666;">Cancel</button>
                 <button onclick="saveItem()" style="background:#28a745;">Save</button>
             </div>
@@ -828,6 +842,7 @@
         }
 
         function showErrorModal(errorData) {
+            console.log("errorData", errorData)
             const modal = document.getElementById('error-modal');
             const messageEl = document.getElementById('error-modal-message');
             const bodyEl = document.getElementById('error-modal-body');
@@ -855,11 +870,21 @@
                         if (err.item) {
                             const highlightedJson = highlightJsonPath(err.item, err.path);
                             itemHtml += `<pre>${highlightedJson}</pre>`;
+                        } else if (err.path && err.path.length) {
+                            itemHtml += `<div class="error-item-details" style="color: #888; font-style: italic;">No item data available</div>`;
                         }
 
                         itemDiv.innerHTML = itemHtml;
                         bodyEl.appendChild(itemDiv);
                     });
+                    const jsonErrorRaw = document.createElement('pre');
+                    jsonErrorRaw.innerText = JSON.stringify(errorData, null, 2);
+
+                    jsonErrorRaw.style.border = "1px solid red";
+                    jsonErrorRaw.style.padding = "10px";
+                    jsonErrorRaw.style.borderRadius = "6px";
+
+                    bodyEl.appendChild(jsonErrorRaw);
                 } else {
                     bodyEl.innerHTML = `<pre>${JSON.stringify(errorData, null, 2)}</pre>`;
                 }
@@ -1036,6 +1061,7 @@
             document.getElementById('item-modal-title').innerText = 'Add Item';
             document.getElementById('item-error').style.display = 'none';
             document.getElementById('item-error').innerText = '';
+            window.lastItemError = null;
             switchItemView('form');
             renderFormEditor({});
             document.getElementById('item-modal').style.display = 'flex';
@@ -1046,6 +1072,7 @@
             editIndex = idx;
             document.getElementById('item-modal-title').innerText = 'View Item';
             document.getElementById('item-error').style.display = 'none';
+            window.lastItemError = null;
             switchItemView('form');
             renderFormEditor({ ...tableData[idx] }, true);
             document.getElementById('item-modal').style.display = 'flex';
@@ -1056,6 +1083,7 @@
             editIndex = idx;
             document.getElementById('item-modal-title').innerText = 'Edit Item';
             document.getElementById('item-error').style.display = 'none';
+            window.lastItemError = null;
             switchItemView('form');
             renderFormEditor({ ...tableData[idx] }, false);
             document.getElementById('item-modal').style.display = 'flex';
@@ -1063,6 +1091,8 @@
 
         function closeItemModal() {
             document.getElementById('item-modal').style.display = 'none';
+            document.getElementById('item-error').style.display = 'none';
+            window.lastItemError = null;
             if (itemEditor) itemEditor.setValue('');
         }
 
@@ -1241,7 +1271,9 @@
                 try {
                     data = JSON.parse(jsonStr);
                 } catch (e) {
-                    document.getElementById('item-error').innerText = 'Invalid JSON: ' + e.message;
+                    const errorDetail = { message: 'Invalid JSON: ' + e.message, errors: [{ message: e.message, field: 'JSON', item: { _raw: jsonStr } }] };
+                    window.lastItemError = errorDetail;
+                    document.getElementById('item-error').innerText = '❌ Invalid JSON: Click for details';
                     document.getElementById('item-error').style.display = 'block';
                     return;
                 }
@@ -1250,7 +1282,9 @@
             }
 
             if (Object.keys(data).length === 0) {
-                document.getElementById('item-error').innerText = 'Item cannot be empty';
+                const errorDetail = { message: 'Item cannot be empty', errors: [] };
+                window.lastItemError = errorDetail;
+                document.getElementById('item-error').innerText = '❌ Item cannot be empty: Click for details';
                 document.getElementById('item-error').style.display = 'block';
                 return;
             }
@@ -1264,7 +1298,16 @@
             if (!validation.valid) {
                 console.log('Showing validation error UI');
                 const errorMsg = 'Schema validation failed: ' + validation.fields.join(', ');
-                document.getElementById('item-error').innerText = errorMsg;
+                const errorDetail = {
+                    message: errorMsg, errors: validation.errors.map(e => ({
+                        message: e.message,
+                        field: e.instancePath.replace('/', '') || 'root',
+                        path: [e.instancePath.replace('/', '')],
+                        item: data
+                    }))
+                };
+                window.lastItemError = errorDetail;
+                document.getElementById('item-error').innerText = '❌ ' + errorMsg + ': Click for details';
                 document.getElementById('item-error').style.display = 'block';
                 window.validationErrors = validation.errors;
                 highlightRowWithError(validation);
@@ -1284,7 +1327,7 @@
                 closeItemModal();
                 renderTable();
             } catch (e) {
-                document.getElementById('item-error').innerText = e.message;
+                document.getElementById('item-error').innerText = '❌ ' + e.message + ': Click for details';
                 document.getElementById('item-error').style.display = 'block';
             }
         }
@@ -1297,7 +1340,12 @@
             });
             if (!res.ok) {
                 const err = await res.json();
-                throw new Error(err.detail?.message || err.detail || 'Failed to save item');
+                const errorDetail = err.detail || { message: err.detail?.message || 'Failed to save item' };
+                window.lastItemError = {
+                    message: errorDetail.message,
+                    errors: errorDetail.errors?.map(e => ({ ...e, item: data }))
+                };
+                throw new Error(errorDetail.message || err.detail || 'Failed to save item');
             }
             return await res.json();
         }
@@ -1310,9 +1358,20 @@
             });
             if (!res.ok) {
                 const err = await res.json();
-                throw new Error(err.detail?.message || err.detail || 'Failed to update item');
+                const errorDetail = err.detail || { message: err.detail?.message || 'Failed to update item' };
+                window.lastItemError = {
+                    message: errorDetail.message,
+                    errors: errorDetail.errors?.map(e => ({ ...e, item: data }))
+                };
+                throw new Error(errorDetail.message || err.detail || 'Failed to update item');
             }
             return await res.json();
+        }
+
+        function showItemErrorModal() {
+            if (window.lastItemError) {
+                showErrorModal(window.lastItemError);
+            }
         }
 
         function highlightRowWithError(validation) {
@@ -1541,7 +1600,7 @@
                     statusEl.style.cursor = 'pointer';
                     statusEl.style.background = '#dc3545';
                     statusEl.style.color = 'white';
-                    statusEl.style.padding = '6px 12px';
+                    statusEl.style.padding = '3px 12px';
                     statusEl.style.borderRadius = '4px';
                     statusEl.style.border = 'none';
                     statusEl.style.display = 'inline-block';
