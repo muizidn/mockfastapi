@@ -54,9 +54,14 @@ async def init_db():
                 response_body TEXT,
                 status_code INTEGER,
                 duration_ms REAL,
-                function_logs TEXT
+                function_logs TEXT,
+                project_id TEXT
             )
         """)
+        try:
+            await db.execute("ALTER TABLE api_logs ADD COLUMN project_id TEXT")
+        except Exception:
+            pass
         await db.commit()
 
 
@@ -64,8 +69,8 @@ async def log_api_call(log_data: Dict):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             """
-            INSERT INTO api_logs (timestamp, method, endpoint, params, headers, query_params, request_body, response_body, status_code, duration_ms, function_logs)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO api_logs (timestamp, method, endpoint, params, headers, query_params, request_body, response_body, status_code, duration_ms, function_logs, project_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 log_data.get("timestamp"),
@@ -79,6 +84,7 @@ async def log_api_call(log_data: Dict):
                 log_data.get("status_code"),
                 log_data.get("duration_ms"),
                 log_data.get("function_logs"),
+                log_data.get("project_id"),
             ),
         )
         await db.commit()
@@ -153,8 +159,11 @@ class LoggingMiddleware:
         duration = (datetime.now() - start_time).total_seconds() * 1000
 
         headers = {}
+        project_id = None
         for name, value in scope.get("headers", []):
             name_str = name.decode("utf-8")
+            if name_str == "x-project-id":
+                project_id = value.decode("utf-8")
             if name_str not in ["authorization", "cookie", "host"]:
                 headers[name_str] = value.decode("utf-8")
 
@@ -180,6 +189,7 @@ class LoggingMiddleware:
             "status_code": status_code,
             "duration_ms": round(duration, 2),
             "function_logs": None,
+            "project_id": project_id,
         }
 
         try:
@@ -833,6 +843,7 @@ async def get_logs(
     method: Optional[str] = None,
     endpoint: Optional[str] = None,
     status_code: Optional[int] = None,
+    project_id: Optional[str] = None,
     sort_by: str = Query(default="timestamp"),
     sort_order: str = Query(default="desc"),
 ):
@@ -850,6 +861,9 @@ async def get_logs(
         if status_code:
             query += " AND status_code = ?"
             params.append(status_code)
+        if project_id:
+            query += " AND project_id = ?"
+            params.append(project_id)
 
         order_map = {
             "timestamp": "timestamp",
@@ -868,12 +882,22 @@ async def get_logs(
         cursor = await db.execute(query, params)
         rows = await cursor.fetchall()
 
-        cursor = await db.execute(
-            "SELECT COUNT(*) as count FROM api_logs WHERE 1=1"
-            + (f" AND method = '{method}'" if method else "")
-            + (f" AND endpoint LIKE '%{endpoint}%'" if endpoint else "")
-            + (f" AND status_code = {status_code}" if status_code else "")
-        )
+        count_query = "SELECT COUNT(*) as count FROM api_logs WHERE 1=1"
+        count_params = []
+        if method:
+            count_query += " AND method = ?"
+            count_params.append(method)
+        if endpoint:
+            count_query += " AND endpoint LIKE ?"
+            count_params.append(f"%{endpoint}%")
+        if status_code:
+            count_query += " AND status_code = ?"
+            count_params.append(status_code)
+        if project_id:
+            count_query += " AND project_id = ?"
+            count_params.append(project_id)
+
+        cursor = await db.execute(count_query, count_params)
         count_row = await cursor.fetchone()
         total = count_row[0] if count_row else 0
 

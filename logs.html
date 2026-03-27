@@ -223,6 +223,12 @@
 
     <div id="filters">
         <div class="filter-group">
+            <label>Project:</label>
+            <select id="filter-project" style="min-width: 150px;">
+                <option value="">Select project...</option>
+            </select>
+        </div>
+        <div class="filter-group">
             <label>Method:</label>
             <select id="filter-method">
                 <option value="">All</option>
@@ -306,8 +312,41 @@
     <script>
         let logs = [];
         let selectedLogs = new Set();
+        let projects = [];
+
+        async function loadProjects() {
+            try {
+                const res = await fetch('/api/v1/projects');
+                projects = await res.json();
+                renderProjectDropdown();
+            } catch (e) {
+                console.error('Failed to load projects:', e);
+            }
+        }
+
+        function renderProjectDropdown() {
+            const select = document.getElementById('filter-project');
+            const savedProject = localStorage.getItem('logs_project') || localStorage.getItem('active_project');
+            
+            if (projects.length === 0) {
+                select.innerHTML = '<option value="">No projects</option>';
+                return;
+            }
+            
+            select.innerHTML = '<option value="">Select project...</option>' + 
+                projects.map(p => `<option value="${p.id}" ${savedProject === p.id ? 'selected' : ''}>${escapeHtml(p.title || p.id)}</option>`).join('');
+        }
 
         async function refreshLogs() {
+            const projectId = document.getElementById('filter-project').value;
+            
+            if (!projectId) {
+                logs = [];
+                document.getElementById('logs-container').innerHTML = '<div class="empty-state">Please select a project to view logs</div>';
+                document.getElementById('count').innerText = '0 logs';
+                return;
+            }
+
             const method = document.getElementById('filter-method').value;
             const endpoint = document.getElementById('filter-endpoint').value;
             const status = document.getElementById('filter-status').value;
@@ -318,6 +357,7 @@
             if (method) url += `&method=${method}`;
             if (endpoint) url += `&endpoint=${encodeURIComponent(endpoint)}`;
             if (status) url += `&status_code=${status}`;
+            if (projectId) url += `&project_id=${encodeURIComponent(projectId)}`;
 
             try {
                 const res = await fetch(url);
@@ -330,6 +370,19 @@
             }
         }
 
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        document.getElementById('filter-project').addEventListener('change', (e) => {
+            localStorage.setItem('logs_project', e.target.value);
+            refreshLogs();
+        });
+
+        loadProjects().then(() => refreshLogs());
+
         function renderLogs() {
             const container = document.getElementById('logs-container');
             if (logs.length === 0) {
@@ -341,8 +394,8 @@
                 const statusClass = log.status_code >= 200 && log.status_code < 300 ? 'success' : 'error';
                 const isSelected = selectedLogs.has(log.id);
                 return `
-                    <div class="log-item ${isSelected ? 'selected' : ''}">
-                        <div class="checkbox-cell">
+                    <div class="log-item ${isSelected ? 'selected' : ''}" onclick="selectLog(${log.id}, event)">
+                        <div class="checkbox-cell" onclick="event.stopPropagation()">
                             <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleLogSelection(${log.id}, event)">
                         </div>
                         <span class="method ${log.method}">${log.method}</span>
@@ -350,7 +403,6 @@
                         <span class="status ${statusClass}">${log.status_code}</span>
                         <span class="duration">${log.duration_ms?.toFixed(0) || 0}ms</span>
                         <span class="timestamp">${new Date(log.timestamp).toLocaleTimeString()}</span>
-                        <span style="margin-left:10px;cursor:pointer;color:#007acc;" onclick="selectLog(${log.id}, event)">View</span>
                     </div>
                 `;
             }).join('');
