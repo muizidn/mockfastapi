@@ -315,15 +315,33 @@ def delete_resource_schema(resource: str):
         os.remove(path)
 
 
-def validate_against_schema(data: Any, schema: Dict) -> tuple[bool, Optional[str]]:
+def validate_against_schema(data: Any, schema: Dict) -> tuple[bool, Optional[Dict]]:
     try:
         jsonschema.validate(instance=data, schema=schema)
         return True, None
-    except ValidationError as e:
-        return False, e.message
-    except Exception as e:
-        return False, str(e)
 
+    except ValidationError as e:
+        # 🧠 Extract field path
+        field_path = list(e.path)
+
+        # special handling for "required"
+        if e.validator == "required":
+            missing_field = e.message.split("'")[1]
+            field_path = field_path + [missing_field]
+
+        return False, {
+            "message": e.message,
+            "field": field_path[-1] if field_path else None,
+            "path": field_path,
+            "validator": e.validator,
+            "validator_value": e.validator_value
+        }
+
+    except Exception as e:
+        return False, {
+            "message": str(e),
+            "field": None
+        }
 
 # --- FUNCTION UTILITIES ---
 
@@ -886,7 +904,19 @@ async def create_item(resource: str, item: Dict[str, Any] = Body(...)):
         valid, error = validate_against_schema(item, schema)
         if not valid:
             raise HTTPException(
-                status_code=400, detail=f"Schema validation failed: {error}"
+                status_code=400,
+                detail={
+                    "message": "Validation failed",
+                    "errors": [
+                        {
+                            "index": 0,
+                            "message": error.get("message"),
+                            "field": error.get("field"),
+                            "path": error.get("path"),
+                            "validator": error.get("validator"),
+                        }
+                    ]
+                }
             )
     data = get_resource_data(resource)
     data.append(item)
@@ -897,12 +927,33 @@ async def create_item(resource: str, item: Dict[str, Any] = Body(...)):
 @app.post("/api/v1/r/{resource}/bulk/update")
 async def bulk_overwrite(resource: str, items: Any = Body(...)):
     schema = get_resource_schema(resource)
+
+    errors = []
+
     if schema:
         for i, item in enumerate(items):
             valid, error = validate_against_schema(item, schema)
             if not valid:
-                raise HTTPException(status_code=400, detail=f"Item {i}: {error}")
+                errors.append({
+                    "index": i,
+                    "message": error.get("message"),
+                    "field": error.get("field"),
+                    "path": error.get("path"),
+                    "validator": error.get("validator"),
+                    "item": item
+                })
+
+    if errors:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Validation failed",
+                "errors": errors
+            }
+        )
+
     save_resource_data(resource, items)
+
     return {"status": "ok"}
 
 
@@ -924,7 +975,19 @@ async def update_item(
         valid, error = validate_against_schema(updated_item, schema)
         if not valid:
             raise HTTPException(
-                status_code=400, detail=f"Schema validation failed: {error}"
+                status_code=400,
+                detail={
+                    "message": "Validation failed",
+                    "errors": [
+                        {
+                            "index": 0,
+                            "message": error.get("message"),
+                            "field": error.get("field"),
+                            "path": error.get("path"),
+                            "validator": error.get("validator"),
+                        }
+                    ]
+                }
             )
     data = get_resource_data(resource)
     for i, item in enumerate(data):
@@ -949,7 +1012,19 @@ async def patch_item(
         valid, error = validate_against_schema(merged_data, schema)
         if not valid:
             raise HTTPException(
-                status_code=400, detail=f"Schema validation failed: {error}"
+                status_code=400,
+                detail={
+                    "message": "Validation failed",
+                    "errors": [
+                        {
+                            "index": 0,
+                            "message": error.get("message"),
+                            "field": error.get("field"),
+                            "path": error.get("path"),
+                            "validator": error.get("validator"),
+                        }
+                    ]
+                }
             )
 
     data = get_resource_data(resource)

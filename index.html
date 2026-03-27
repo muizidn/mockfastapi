@@ -463,7 +463,9 @@
             (Ctrl+S)</button>
         <button onclick="openSchemaModal()" id="schema-btn" style="background: #6f42c1;">Set Schema</button>
         <span id="schema-indicator" class="status-msg" style="color: #6f42c1;"></span>
-        <span id="validation-error" style="color: white; font-weight: bold; cursor: pointer; display: none; background: #dc3545; padding: 6px 12px; border-radius: 4px; margin-left: 10px; font-size: 12px;" onclick="showValidationErrorDetails()" title="Click to see error details"></span>
+        <span id="validation-error"
+            style="color: white; font-weight: bold; cursor: pointer; display: none; background: #dc3545; padding: 6px 12px; border-radius: 4px; margin-left: 10px; font-size: 12px;"
+            onclick="showValidationErrorDetails()" title="Click to see error details"></span>
         <span id="status" class="status-msg"></span>
         <div style="margin-left: auto; display: flex; gap: 5px;">
             <button onclick="toggleSidePanel()" id="toggle-panel-btn" style="background: #666;">Transform ▶</button>
@@ -515,7 +517,8 @@
                 <button id="json-view-btn" onclick="switchItemView('json')">JSON</button>
             </div>
             <div class="modal-body">
-                <div id="error-banner" style="display:none; background: #dc3545; color: white; padding: 15px; margin-bottom: 15px; border-radius: 4px; font-weight: bold;">
+                <div id="error-banner"
+                    style="display:none; background: #dc3545; color: white; padding: 15px; margin-bottom: 15px; border-radius: 4px; font-weight: bold;">
                     <div id="error-banner-text"></div>
                     <div id="field-errors" style="margin-top: 10px; font-size: 12px;"></div>
                 </div>
@@ -1067,19 +1070,19 @@
                 console.log('No schema found, skipping validation');
                 return { valid: true };
             }
-            
+
             try {
                 const AjvCode = await fetch('https://cdn.jsdelivr.net/npm/ajv@8/dist/ajv.bundle.min.js').then(r => r.text());
                 const Ajv = eval(AjvCode);
                 const validator = new Ajv({ allErrors: true });
                 const validate = validator.compile(schema);
-                
+
                 if (!validate(data)) {
                     const errors = validate.errors;
                     console.log('Validation errors:', errors);
                     const errorFields = errors.map(e => e.instancePath.replace('/', '') || 'root').filter(Boolean);
-                    return { 
-                        valid: false, 
+                    return {
+                        valid: false,
                         error: JSON.stringify(errors, null, 2),
                         errors: errors,
                         fields: [...new Set(errorFields)]
@@ -1121,7 +1124,7 @@
             const validation = await validateItemData(data);
             console.log('Validating item:', data);
             console.log('Validation result:', validation);
-            
+
             if (!validation.valid) {
                 console.log('Showing validation error UI');
                 const errorMsg = 'Schema validation failed: ' + validation.fields.join(', ');
@@ -1153,17 +1156,17 @@
 
         function showValidationError(errorMsg, errorFields) {
             if (!errorMsg) errorMsg = window.lastValidationError || 'Validation error';
-            
+
             const errorText = '❌ Validation Error: ' + (errorFields ? errorFields.join(', ') : 'Check details');
             document.getElementById('validation-error').innerText = errorText;
             document.getElementById('validation-error').style.display = 'inline-block';
             document.getElementById('validation-error').style.cursor = 'pointer';
             document.getElementById('validation-error').title = 'Click to see error details';
             window.lastValidationError = errorMsg;
-            
+
             document.getElementById('error-banner-text').innerHTML = errorMsg.replace(/\n/g, '<br>');
             document.getElementById('error-banner').style.display = 'block';
-            
+
             const fieldErrorsDiv = document.getElementById('field-errors');
             if (window.validationErrors) {
                 const errorsList = window.validationErrors.map(e => {
@@ -1181,13 +1184,13 @@
         function showValidationErrorDetails() {
             const errorMsg = window.lastValidationError || 'Unknown validation error';
             const errors = window.validationErrors || [];
-            
+
             let message = 'Schema Validation Errors:\n\n';
             errors.forEach((e, i) => {
                 const path = e.instancePath.replace('/', '') || 'root';
                 message += `${i + 1}. Field: ${path}\n   ${e.message}\n\n`;
             });
-            
+
             alert(message);
         }
 
@@ -1229,100 +1232,115 @@
             }
         }
 
-        function highlightEditorErrorsFromBackend(errorMsg, content) {
-            const match = errorMsg.match(/Item (\d+): (.+)/);
-            if (!match) return;
-            
-            const itemIndex = parseInt(match[1]);
-            const errorDetail = match[2];
-            
-            try {
-                const data = JSON.parse(content);
-                if (!Array.isArray(data) || !data[itemIndex]) return;
-                
-                const item = data[itemIndex];
-                
-                let errorField = null;
-                if (errorDetail.includes("is a required property")) {
-                    const fieldMatch = errorDetail.match(/'([^']+)' is a required property/);
-                    errorField = fieldMatch ? fieldMatch[1] : null;
-                } else if (errorDetail.includes("should be")) {
-                    const fieldMatch = errorDetail.match(/property '([^']+)'/);
-                    errorField = fieldMatch ? fieldMatch[1] : null;
-                }
-                
-                if (!errorField) return;
-                
-                clearEditorErrors();
-                
-                const lines = content.split('\n');
-                let currentItem = -1;
+        function highlightEditorErrorsFromBackend(errors) {
+            if (!Array.isArray(errors) || !editor) return;
+
+            clearEditorErrors();
+
+            const content = editor.getValue(); // still needed for line mapping
+            const lines = content.split('\n');
+            const decorations = [];
+
+            errors.forEach(err => {
+                const errorMessage = err.message;
+                const errorField = err.field;
+                const errorItem = err.item;
+
+                if (!errorItem) return;
+
+                // 🔍 Find item position by matching unique signature
                 let itemStartLine = -1;
-                
+
+                // Try to find a unique key (id is best)
+                const uniqueKey = errorItem.id
+                    ? `"id": "${errorItem.id}"`
+                    : Object.keys(errorItem)[0]
+                        ? `"${Object.keys(errorItem)[0]}"`
+                        : null;
+
+                if (!uniqueKey) return;
+
                 for (let i = 0; i < lines.length; i++) {
-                    if (lines[i].trim().startsWith('{') || lines[i].trim() === '[') {
-                        if (lines[i].trim() === '[') {
-                            currentItem = 0;
-                            itemStartLine = i + 1;
-                        } else if (lines[i].trim() === '{') {
-                            currentItem++;
-                            if (currentItem === itemIndex) {
-                                itemStartLine = i;
+                    if (lines[i].includes(uniqueKey)) {
+                        // walk backwards to find `{`
+                        for (let j = i; j >= 0; j--) {
+                            if (lines[j].trim().startsWith('{')) {
+                                itemStartLine = j;
                                 break;
                             }
                         }
-                    }
-                }
-                
-                if (itemStartLine === -1) return;
-                
-                const decorations = [];
-                const regex = new RegExp(`"(${errorField})"\\s*:`);
-                
-                for (let i = itemStartLine; i < lines.length && i < itemStartLine + 50; i++) {
-                    if (regex.test(lines[i])) {
-                        decorations.push({
-                            range: new monaco.Range(i + 1, 1, i + 1, lines[i].length + 1),
-                            options: {
-                                isWholeLine: true,
-                                className: 'editor-error-line',
-                                glyphMarginClassName: 'editor-error-glyph',
-                                glyphMarginHoverMessage: { value: errorDetail }
-                            }
-                        });
                         break;
                     }
                 }
-                
-                if (decorations.length > 0) {
-                    window.mainEditorDecorationIds = editor.deltaDecorations([], decorations);
+
+                if (itemStartLine === -1) return;
+
+                let foundLine = -1;
+
+                // 🎯 Highlight field if exists
+                if (errorField) {
+                    const regex = new RegExp(`"(${errorField})"\\s*:`);
+
+                    for (let i = itemStartLine; i < lines.length && i < itemStartLine + 100; i++) {
+                        if (regex.test(lines[i])) {
+                            foundLine = i;
+                            break;
+                        }
+
+                        if (lines[i].includes('}')) break;
+                    }
                 }
-            } catch (e) {
-                console.error('Error highlighting:', e);
+
+                // fallback → highlight whole object
+                if (foundLine === -1) {
+                    foundLine = itemStartLine;
+                }
+
+                decorations.push({
+                    range: new monaco.Range(
+                        foundLine + 1,
+                        1,
+                        foundLine + 1,
+                        lines[foundLine].length + 1
+                    ),
+                    options: {
+                        isWholeLine: true,
+                        className: 'editor-error-line',
+                        glyphMarginClassName: 'editor-error-glyph',
+                        glyphMarginHoverMessage: {
+                            value: `❌ ${errorMessage}`
+                        }
+                    }
+                });
+            });
+
+            if (decorations.length > 0) {
+                window.mainEditorDecorationIds =
+                    editor.deltaDecorations(window.mainEditorDecorationIds || [], decorations);
             }
         }
 
         function highlightEditorErrors(validation, data) {
             if (!validation || !validation.errors || !itemEditor) return;
-            
+
             clearEditorErrors();
-            
+
             const decorations = [];
             validation.errors.forEach(error => {
                 const path = error.instancePath.replace('/', '').split('/').filter(Boolean);
-                
+
                 if (path.length === 0) return;
-                
+
                 const fieldName = path[path.length - 1];
                 let searchIn = data;
                 for (const p of path.slice(0, -1)) {
                     searchIn = searchIn[p];
                     if (!searchIn) return;
                 }
-                
+
                 const jsonContent = itemEditor.getValue();
                 const regex = new RegExp(`"(${fieldName})"\\s*:`);
-                
+
                 const lines = jsonContent.split('\n');
                 for (let i = 0; i < lines.length; i++) {
                     if (regex.test(lines[i])) {
@@ -1339,7 +1357,7 @@
                     }
                 }
             });
-            
+
             if (decorations.length > 0) {
                 window.editorDecorationIds = itemEditor.deltaDecorations([], decorations);
             }
@@ -1386,7 +1404,7 @@
                     statusEl.style.cursor = 'pointer';
                     statusEl.style.color = '#dc3545';
                     statusEl.title = 'Click to see details';
-                    statusEl.onclick = function() { alert('Save Error:\n\n' + errorMsg); };
+                    statusEl.onclick = function () { alert('Save Error:\n\n' + errorMsg); };
                     window.lastValidationError = errorMsg;
                     throw new Error(errorMsg);
                 }
@@ -1429,13 +1447,16 @@
                 } else {
                     const err = await res.json();
                     btn.innerText = "Save (Ctrl+S)";
-                    const errorMsg = err.detail || 'Save Failed';
-                    status.innerText = "❌ " + errorMsg;
+                    const errorData = err.detail || 'Save Failed';
+                    status.innerText = "❌ " + errorData.message;
                     status.style.cursor = 'pointer';
                     status.style.color = '#dc3545';
                     status.title = 'Click to see details';
-                    status.onclick = function() { alert('Save Error:\n\n' + errorMsg); };
-                    highlightEditorErrorsFromBackend(errorMsg, content);
+                    status.onclick = function () { alert('Save Error:\n\n' + JSON.stringify(errorData, null, 2)); };
+                    const structuredErrors = errorData.errors;
+                    if (structuredErrors) {
+                        highlightEditorErrorsFromBackend(structuredErrors, content);
+                    }
                 }
             } catch (e) {
                 btn.innerText = "Save (Ctrl+S)";
