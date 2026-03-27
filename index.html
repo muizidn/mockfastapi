@@ -507,9 +507,6 @@
             (Ctrl+S)</button>
         <button onclick="openSchemaModal()" id="schema-btn" style="background: #6f42c1;">Set Schema</button>
         <span id="schema-indicator" class="status-msg" style="color: #6f42c1;"></span>
-        <span id="validation-error"
-            style="color: white; font-weight: bold; cursor: pointer; display: none; background: #dc3545; padding: 6px 12px; border-radius: 4px; margin-left: 10px; font-size: 12px;"
-            onclick="showValidationErrorDetails()" title="Click to see error details"></span>
         <span id="status" class="status-msg"></span>
         <div style="margin-left: auto; display: flex; gap: 5px;">
             <button onclick="toggleSidePanel()" id="toggle-panel-btn" style="background: #666;">Transform ▶</button>
@@ -1246,7 +1243,6 @@
                 } catch (e) {
                     document.getElementById('item-error').innerText = 'Invalid JSON: ' + e.message;
                     document.getElementById('item-error').style.display = 'block';
-                    showValidationError('Invalid JSON: ' + e.message);
                     return;
                 }
             } else {
@@ -1256,12 +1252,10 @@
             if (Object.keys(data).length === 0) {
                 document.getElementById('item-error').innerText = 'Item cannot be empty';
                 document.getElementById('item-error').style.display = 'block';
-                showValidationError('Item cannot be empty');
                 return;
             }
 
             document.getElementById('item-error').style.display = 'none';
-            clearValidationErrors();
 
             const validation = await validateItemData(data);
             console.log('Validating item:', data);
@@ -1273,7 +1267,6 @@
                 document.getElementById('item-error').innerText = errorMsg;
                 document.getElementById('item-error').style.display = 'block';
                 window.validationErrors = validation.errors;
-                showValidationError(validation.error, validation.fields);
                 highlightRowWithError(validation);
                 highlightEditorErrors(validation, data);
                 return;
@@ -1281,69 +1274,45 @@
 
             try {
                 if (itemMode === 'add') {
+                    await saveSingleItem(data);
                     tableData.push(data);
                 } else if (itemMode === 'edit') {
+                    const itemId = tableData[editIndex].id || tableData[editIndex]._id || editIndex;
+                    await updateSingleItem(itemId, data);
                     tableData[editIndex] = data;
                 }
-                await saveTableData();
                 closeItemModal();
                 renderTable();
-                clearValidationErrors();
             } catch (e) {
                 document.getElementById('item-error').innerText = e.message;
                 document.getElementById('item-error').style.display = 'block';
-                showValidationError(e.message);
             }
         }
 
-        function showValidationError(errorMsg, errorFields) {
-            if (!errorMsg) errorMsg = window.lastValidationError || 'Validation error';
-
-            const errorText = '❌ Validation Error: ' + (errorFields ? errorFields.join(', ') : 'Check details');
-            document.getElementById('validation-error').innerText = errorText;
-            document.getElementById('validation-error').style.display = 'inline-block';
-            document.getElementById('validation-error').style.cursor = 'pointer';
-            document.getElementById('validation-error').title = 'Click to see error details';
-            window.lastValidationError = errorMsg;
-
-            document.getElementById('error-banner-text').innerHTML = errorMsg.replace(/\n/g, '<br>');
-            document.getElementById('error-banner').style.display = 'block';
-
-            const fieldErrorsDiv = document.getElementById('field-errors');
-            if (window.validationErrors) {
-                const errorsList = window.validationErrors.map(e => {
-                    const path = e.instancePath.replace('/', '') || 'root';
-                    return `<div style="color: #ffc107; margin: 5px 0; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px;">
-                        <strong>Field: ${path}</strong><br>
-                        <span style="color: #fff; font-size: 12px;">${e.message}</span>
-                    </div>`;
-                }).join('');
-                fieldErrorsDiv.innerHTML = '<div style="color: white; font-weight: bold; margin-bottom: 8px;">Detailed Errors:</div>' + errorsList;
-                fieldErrorsDiv.style.display = 'block';
-            }
-        }
-
-        function showValidationErrorDetails() {
-            const errorMsg = window.lastValidationError || 'Unknown validation error';
-            const errors = window.validationErrors || [];
-
-            let message = 'Schema Validation Errors:\n\n';
-            errors.forEach((e, i) => {
-                const path = e.instancePath.replace('/', '') || 'root';
-                message += `${i + 1}. Field: ${path}\n   ${e.message}\n\n`;
+        async function saveSingleItem(data) {
+            const res = await fetch(`/api/v1/r/${activeProject}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
             });
-
-            alert(message);
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail?.message || err.detail || 'Failed to save item');
+            }
+            return await res.json();
         }
 
-        function clearValidationErrors() {
-            document.getElementById('validation-error').style.display = 'none';
-            document.getElementById('item-error').style.display = 'none';
-            document.getElementById('field-errors').style.display = 'none';
-            document.getElementById('error-banner').style.display = 'none';
-            window.validationErrors = null;
-            clearRowHighlights();
-            clearEditorErrors();
+        async function updateSingleItem(itemId, data) {
+            const res = await fetch(`/api/v1/r/${activeProject}/${itemId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail?.message || err.detail || 'Failed to update item');
+            }
+            return await res.json();
         }
 
         function highlightRowWithError(validation) {
@@ -1505,11 +1474,28 @@
             }
         }
 
-        function deleteRow(idx) {
+        async function deleteRow(idx) {
             if (!confirm('Delete this row?')) return;
-            tableData.splice(idx, 1);
-            saveTableData();
-            renderTable();
+            const item = tableData[idx];
+            const itemId = item.id || item._id || idx;
+            try {
+                await deleteSingleItem(itemId);
+                tableData.splice(idx, 1);
+                renderTable();
+            } catch (e) {
+                alert('Failed to delete: ' + e.message);
+            }
+        }
+
+        async function deleteSingleItem(itemId) {
+            const res = await fetch(`/api/v1/r/${activeProject}/${itemId}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail?.message || err.detail || 'Failed to delete item');
+            }
+            return await res.json();
         }
 
         async function saveTableData() {
