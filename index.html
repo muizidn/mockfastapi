@@ -1,224 +1,271 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-    <title>MockAPI - Project Selection</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MockAPI - Dashboard</title>
     <style>
         :root {
-            --bg: #1e1e1e;
-            --panel: #252526;
-            --accent: #007acc;
-            --text: #cccccc;
-            --border: #444;
+            --bg: #0f111a;
+            --panel: #1a1d27;
+            --accent: #38bdf8;
+            --accent-hover: #0ea5e9;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --danger: #ef4444;
         }
+
         body {
             margin: 0;
-            font-family: 'Segoe UI', sans-serif;
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
             background: var(--bg);
             color: var(--text);
-            min-height: 100vh;
+            line-height: 1.5;
         }
+
+        /* Header & Banner */
+        .header-bar {
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .welcome-banner {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .welcome-text h1 {
+            margin: 0;
+            font-size: 2rem;
+            color: white;
+        }
+
+        .welcome-text p {
+            color: var(--text-muted);
+            margin: 0.5rem 0 0 0;
+        }
+
         .container {
-            max-width: 900px;
-            margin: 60px auto;
-            padding: 20px;
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 0 20px;
         }
-        h1 {
-            font-size: 28px;
-            margin-bottom: 10px;
+
+        /* Project Grid */
+        .project-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
         }
-        .subtitle {
-            color: #888;
-            margin-bottom: 40px;
-        }
+
         .project-card {
             background: var(--panel);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 15px;
-            cursor: pointer;
-            transition: 0.2s;
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.2s ease;
+            position: relative;
         }
+
         .project-card:hover {
             border-color: var(--accent);
-            transform: translateY(-2px);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
         }
-        .project-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-        }
+
         .project-title {
-            font-size: 18px;
-            font-weight: bold;
+            font-size: 1.25rem;
+            font-weight: 600;
             color: white;
+            margin-bottom: 8px;
         }
+
         .project-desc {
-            margin-top: 8px;
-            color: #888;
-            font-size: 14px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+            flex-grow: 1;
         }
+
         .project-meta {
-            margin-top: 12px;
-            font-size: 12px;
-            color: #666;
-        }
-        .project-actions {
-            display: flex;
-            gap: 10px;
-        }
-        .project-actions button {
-            background: #444;
-            border: none;
-            color: white;
-            padding: 6px 12px;
+            font-family: monospace;
+            font-size: 0.75rem;
+            background: #0f111a;
+            padding: 4px 8px;
             border-radius: 4px;
+            color: var(--accent);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-weight: 600;
             cursor: pointer;
-            font-size: 12px;
+            border: none;
+            font-size: 0.9rem;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
-        .project-actions button:hover {
-            background: #555;
-        }
-        .project-actions button.delete {
-            background: #dc3545;
-        }
-        .project-actions button.delete:hover {
-            background: #c82333;
-        }
-        .create-form {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 30px;
-        }
-        .create-form h3 {
-            margin-top: 0;
-            margin-bottom: 15px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 13px;
-            color: #888;
-        }
-        .form-group input, .form-group textarea {
-            width: 100%;
-            padding: 10px;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            color: var(--text);
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-        .form-group textarea {
-            height: 80px;
-            resize: vertical;
-        }
+
         .btn-primary {
             background: var(--accent);
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
+            color: #000;
         }
+
         .btn-primary:hover {
-            background: #0098ff;
+            background: var(--accent-hover);
         }
-        .empty-state {
-            text-align: center;
-            padding: 60px;
-            color: #666;
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
         }
-        .empty-state h2 {
-            margin-bottom: 10px;
+
+        .btn-outline:hover {
+            background: var(--border);
         }
-        #edit-modal {
+
+        .btn-danger {
+            background: transparent;
+            color: var(--danger);
+            border: 1px solid transparent;
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .card-actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid var(--border);
+            padding-top: 15px;
+        }
+
+        /* Modal Logic */
+        .modal-overlay {
             display: none;
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
             z-index: 1000;
             justify-content: center;
             align-items: center;
         }
-        #edit-modal > div {
+
+        .modal-content {
             background: var(--panel);
-            padding: 25px;
+            width: 100%;
+            max-width: 500px;
+            padding: 30px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            width: 500px;
+            color: white;
+            box-sizing: border-box;
         }
-        #edit-modal h3 {
-            margin-top: 0;
-        }
-        #edit-modal .modal-actions {
+
+        .modal-footer {
             display: flex;
-            gap: 10px;
             justify-content: flex-end;
-            margin-top: 20px;
-        }
-        #edit-modal .btn-cancel {
-            background: #444;
-        }
-        .header-bar {
-            background: var(--panel);
-            border-bottom: 1px solid var(--border);
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .header-bar h2 {
-            margin: 0;
-            font-size: 18px;
-        }
-        .header-bar a {
-            color: var(--accent);
-            text-decoration: none;
+            gap: 12px;
+            margin-top: 24px;
         }
     </style>
 </head>
-<body>
-    <div class="header-bar">
-        <h2>MockAPI</h2>
-        <a href="/resources">Go to Resources →</a>
-    </div>
-    <div class="container">
-        <h1>Projects</h1>
-        <p class="subtitle">Manage your API mock projects. Each project has its own resources and data.</p>
 
-        <div class="create-form">
-            <h3>Create New Project</h3>
+<body>
+
+    <div class="header-bar">
+        <h2 style="letter-spacing: -0.5px;">Mock<span style="color:var(--accent)">API</span></h2>
+        <div class="user-profile" style="color:var(--text-muted); font-size: 0.9rem;">Admin Dashboard</div>
+    </div>
+
+    <div class="container">
+        <div class="welcome-banner">
+            <div class="welcome-text">
+                <h1>Welcome back!</h1>
+                <p>You have <span id="project-count" style="color:var(--accent)">0</span> active projects ready for
+                    development.</p>
+            </div>
+            <button class="btn btn-primary" onclick="openModal('create-modal')">
+                + New Project
+            </button>
+        </div>
+
+        <div id="project-list" class="project-grid">
+        </div>
+    </div>
+
+    <div id="create-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 style="margin-top:0">Create New Project</h2>
             <div class="form-group">
-                <label>Project ID</label>
-                <input type="text" id="project-id" placeholder="my-project">
+                <label>Project ID (Slug)</label>
+                <input type="text" id="project-id" placeholder="e.g. e-commerce-api">
             </div>
             <div class="form-group">
-                <label>Title</label>
-                <input type="text" id="project-title" placeholder="My Awesome Project">
+                <label>Display Title</label>
+                <input type="text" id="project-title" placeholder="My Awesome API">
             </div>
             <div class="form-group">
                 <label>Description</label>
-                <textarea id="project-desc" placeholder="A brief description of this project..."></textarea>
+                <textarea id="project-desc" rows="3" placeholder="What is this API for?"></textarea>
             </div>
-            <button class="btn-primary" onclick="createProject()">Create Project</button>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('create-modal')">Cancel</button>
+                <button class="btn btn-primary" onclick="createProject()">Create Project</button>
+            </div>
         </div>
-
-        <div id="project-list"></div>
     </div>
 
-    <div id="edit-modal">
-        <div>
-            <h3>Edit Project</h3>
+    <div id="edit-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 style="margin-top:0">Update Project</h2>
             <input type="hidden" id="edit-id">
             <div class="form-group">
                 <label>Title</label>
@@ -226,11 +273,11 @@
             </div>
             <div class="form-group">
                 <label>Description</label>
-                <textarea id="edit-desc"></textarea>
+                <textarea id="edit-desc" rows="3"></textarea>
             </div>
-            <div class="modal-actions">
-                <button class="btn-cancel" onclick="closeEditModal()">Cancel</button>
-                <button class="btn-primary" onclick="saveEdit()">Save</button>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('edit-modal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
             </div>
         </div>
     </div>
@@ -238,45 +285,49 @@
     <script>
         let projects = [];
 
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
         async function loadProjects() {
-            const res = await fetch('/api/v1/projects');
-            projects = await res.json();
+            // Mocking the fetch for this demonstration, replace with your actual fetch
+            try {
+                const res = await fetch('/api/v1/projects');
+                projects = await res.json();
+            } catch (e) { projects = []; }
             renderProjects();
         }
 
         function renderProjects() {
             const list = document.getElementById('project-list');
+            document.getElementById('project-count').textContent = projects.length;
+
             if (projects.length === 0) {
-                list.innerHTML = `
-                    <div class="empty-state">
-                        <h2>No projects yet</h2>
-                        <p>Create your first project above to get started.</p>
-                    </div>
-                `;
+                list.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 50px; color: var(--text-muted);">
+                    <h3>No projects found</h3>
+                    <p>Click "New Project" to get started.</p>
+                </div>`;
                 return;
             }
 
             list.innerHTML = projects.map(p => `
-                <div class="project-card" onclick="selectProject('${p.id}')">
-                    <div class="project-header">
-                        <div>
-                            <div class="project-title">${escapeHtml(p.title || p.id)}</div>
-                            <div class="project-desc">${escapeHtml(p.description || 'No description')}</div>
-                            <div class="project-meta">ID: ${escapeHtml(p.id)}</div>
-                        </div>
-                        <div class="project-actions" onclick="event.stopPropagation()">
-                            <button onclick="editProject('${p.id}')">Edit</button>
-                            <button class="delete" onclick="deleteProject('${p.id}')">Delete</button>
-                        </div>
+                <div class="project-card">
+                    <div>
+                        <div class="project-title">${escapeHtml(p.title || p.id)}</div>
+                        <div class="project-desc">${escapeHtml(p.description || 'No description provided.')}</div>
+                        <span class="project-meta">${escapeHtml(p.id)}</span>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" style="flex:1" onclick="selectProject('${p.id}')">Open</button>
+                        <button class="btn btn-outline" onclick="editProject('${p.id}')">Edit</button>
+                        <button class="btn btn-danger" onclick="deleteProject('${p.id}')">Delete</button>
                     </div>
                 </div>
             `).join('');
         }
 
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text || '';
-            return div.innerHTML;
+        function selectProject(projectId) {
+            localStorage.setItem('active_project', projectId);
+            window.location.href = '/resources';
         }
 
         async function createProject() {
@@ -284,41 +335,18 @@
             const title = document.getElementById('project-title').value.trim();
             const description = document.getElementById('project-desc').value.trim();
 
-            if (!id) {
-                alert('Project ID is required');
-                return;
-            }
+            if (!id) return alert('ID is required');
 
-            if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
-                alert('Project ID can only contain letters, numbers, underscores, and hyphens');
-                return;
-            }
+            const res = await fetch('/api/v1/projects', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, title, description })
+            });
 
-            try {
-                const res = await fetch('/api/v1/projects', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id, title, description })
-                });
-
-                if (!res.ok) {
-                    const err = await res.json();
-                    alert(err.detail || 'Failed to create project');
-                    return;
-                }
-
-                document.getElementById('project-id').value = '';
-                document.getElementById('project-title').value = '';
-                document.getElementById('project-desc').value = '';
+            if (res.ok) {
+                closeModal('create-modal');
                 loadProjects();
-            } catch (e) {
-                alert('Error: ' + e.message);
             }
-        }
-
-        function selectProject(projectId) {
-            localStorage.setItem('active_project', projectId);
-            window.location.href = '/resources';
         }
 
         function editProject(id) {
@@ -327,11 +355,7 @@
             document.getElementById('edit-id').value = id;
             document.getElementById('edit-title').value = p.title || '';
             document.getElementById('edit-desc').value = p.description || '';
-            document.getElementById('edit-modal').style.display = 'flex';
-        }
-
-        function closeEditModal() {
-            document.getElementById('edit-modal').style.display = 'none';
+            openModal('edit-modal');
         }
 
         async function saveEdit() {
@@ -339,53 +363,32 @@
             const title = document.getElementById('edit-title').value.trim();
             const description = document.getElementById('edit-desc').value.trim();
 
-            try {
-                const res = await fetch(`/api/v1/projects/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, description })
-                });
+            const res = await fetch(`/api/v1/projects/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, description })
+            });
 
-                if (!res.ok) {
-                    const err = await res.json();
-                    alert(err.detail || 'Failed to update project');
-                    return;
-                }
-
-                closeEditModal();
+            if (res.ok) {
+                closeModal('edit-modal');
                 loadProjects();
-            } catch (e) {
-                alert('Error: ' + e.message);
             }
         }
 
         async function deleteProject(id) {
-            if (!confirm(`Delete project "${id}"? This will delete all resources and data in this project.`)) {
-                return;
-            }
+            if (!confirm(`Delete project "${id}"?`)) return;
+            await fetch(`/api/v1/projects/${id}`, { method: 'DELETE' });
+            loadProjects();
+        }
 
-            try {
-                const res = await fetch(`/api/v1/projects/${id}`, {
-                    method: 'DELETE'
-                });
-
-                if (!res.ok) {
-                    const err = await res.json();
-                    alert(err.detail || 'Failed to delete project');
-                    return;
-                }
-
-                if (localStorage.getItem('active_project') === id) {
-                    localStorage.removeItem('active_project');
-                }
-
-                loadProjects();
-            } catch (e) {
-                alert('Error: ' + e.message);
-            }
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
         }
 
         loadProjects();
     </script>
 </body>
+
 </html>
