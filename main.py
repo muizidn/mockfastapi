@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Body, Path, Query, Request
+from fastapi import FastAPI, HTTPException, Body, Path, Query, Request, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -19,12 +19,15 @@ from collections import deque
 
 app = FastAPI(title="Quick API Mock JSON")
 DATA_DIR = "./data"
+PROJECTS_DIR = "./data/projects"
 SCHEMA_DIR = "./data/schema"
 FUNCTIONS_DIR = "./data/functions"
 DB_PATH = "./data/api_logs.db"
 
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
+if not os.path.exists(PROJECTS_DIR):
+    os.makedirs(PROJECTS_DIR)
 if not os.path.exists(SCHEMA_DIR):
     os.makedirs(SCHEMA_DIR)
 if not os.path.exists(FUNCTIONS_DIR):
@@ -274,26 +277,102 @@ def apply_complex_filter(data: List[Dict], filter_str: str) -> List[Dict]:
 
 # --- CORE UTILITIES ---
 
+# --- PROJECT UTILITIES ---
 
-def get_resource_data(resource: str) -> List[Dict[str, Any]]:
-    path = os.path.join(DATA_DIR, f"{resource}.json")
+
+def get_project_dir(project_id: str) -> str:
+    return os.path.join(PROJECTS_DIR, project_id)
+
+
+def ensure_project_dir(project_id: str) -> str:
+    project_dir = get_project_dir(project_id)
+    if not os.path.exists(project_dir):
+        os.makedirs(project_dir)
+    return project_dir
+
+
+def get_project(project_id: str) -> Optional[Dict]:
+    path = os.path.join(PROJECTS_DIR, f"{project_id}.json")
     if not os.path.exists(path):
-        return []
+        return None
     try:
         with open(path, "r") as f:
             return json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
-        return []
+        return None
 
 
-def save_resource_data(resource: str, data: Any):
-    path = os.path.join(DATA_DIR, f"{resource}.json")
+def save_project(project_id: str, data: Dict):
+    path = os.path.join(PROJECTS_DIR, f"{project_id}.json")
     with open(path, "w") as f:
         json.dump(data, f, indent=4)
 
 
-def get_resource_schema(resource: str) -> Optional[Dict]:
-    path = os.path.join(SCHEMA_DIR, f"{resource}.json")
+def delete_project(project_id: str):
+    path = os.path.join(PROJECTS_DIR, f"{project_id}.json")
+    if os.path.exists(path):
+        os.remove(path)
+    project_dir = get_project_dir(project_id)
+    if os.path.exists(project_dir):
+        import shutil
+
+        shutil.rmtree(project_dir)
+
+
+def list_projects() -> List[Dict]:
+    files = glob.glob(os.path.join(PROJECTS_DIR, "*.json"))
+    projects = []
+    for f in files:
+        project_id = os.path.basename(f).replace(".json", "")
+        project_data = get_project(project_id)
+        if project_data:
+            projects.append(
+                {
+                    "id": project_id,
+                    "title": project_data.get("title", ""),
+                    "description": project_data.get("description", ""),
+                    "created": project_data.get("created", ""),
+                }
+            )
+    return sorted(projects, key=lambda x: x.get("created", ""))
+
+
+# --- X-PROJECT-ID DEPENDENCY ---
+
+
+def get_project_id(request: Request) -> str:
+    project_id = request.headers.get("x-project-id")
+    if not project_id:
+        raise HTTPException(status_code=400, detail="X-Project-ID header is required")
+    project = get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+    ensure_project_dir(project_id)
+    return project_id
+
+
+def get_resource_data(resource: str, project_id: str) -> List[Dict[str, Any]]:
+    project_dir = get_project_dir(project_id)
+    path = os.path.join(project_dir, f"{resource}.json")
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return []
+
+
+def save_resource_data(resource: str, project_id: str, data: Any):
+    project_dir = get_project_dir(project_id)
+    path = os.path.join(project_dir, f"{resource}.json")
+    with open(path, "w") as f:
+        json.dump(data, f, indent=4)
+
+
+def get_resource_schema(resource: str, project_id: str) -> Optional[Dict]:
+    project_dir = get_project_dir(project_id)
+    path = os.path.join(project_dir, "schema", f"{resource}.json")
     if not os.path.exists(path):
         return None
     try:
@@ -303,16 +382,39 @@ def get_resource_schema(resource: str) -> Optional[Dict]:
         return None
 
 
-def save_resource_schema(resource: str, schema: Dict):
-    path = os.path.join(SCHEMA_DIR, f"{resource}.json")
+def save_resource_schema(resource: str, project_id: str, schema: Dict):
+    project_dir = get_project_dir(project_id)
+    schema_dir = os.path.join(project_dir, "schema")
+    if not os.path.exists(schema_dir):
+        os.makedirs(schema_dir)
+    path = os.path.join(schema_dir, f"{resource}.json")
     with open(path, "w") as f:
         json.dump(schema, f, indent=4)
 
 
-def delete_resource_schema(resource: str):
-    path = os.path.join(SCHEMA_DIR, f"{resource}.json")
+def delete_resource_schema(resource: str, project_id: str):
+    project_dir = get_project_dir(project_id)
+    path = os.path.join(project_dir, "schema", f"{resource}.json")
     if os.path.exists(path):
         os.remove(path)
+
+
+def list_project_resources(project_id: str) -> List[str]:
+    project_dir = get_project_dir(project_id)
+    if not os.path.exists(project_dir):
+        return []
+    files = glob.glob(os.path.join(project_dir, "*.json"))
+    return [os.path.basename(f).replace(".json", "") for f in files]
+
+
+def delete_project_resource(resource: str, project_id: str):
+    project_dir = get_project_dir(project_id)
+    path = os.path.join(project_dir, f"{resource}.json")
+    if os.path.exists(path):
+        os.remove(path)
+    schema_path = os.path.join(project_dir, "schema", f"{resource}.json")
+    if os.path.exists(schema_path):
+        os.remove(schema_path)
 
 
 def validate_against_schema(data: Any, schema: Dict) -> tuple[bool, Optional[Dict]]:
@@ -334,14 +436,12 @@ def validate_against_schema(data: Any, schema: Dict) -> tuple[bool, Optional[Dic
             "field": field_path[-1] if field_path else None,
             "path": field_path,
             "validator": e.validator,
-            "validator_value": e.validator_value
+            "validator_value": e.validator_value,
         }
 
     except Exception as e:
-        return False, {
-            "message": str(e),
-            "field": None
-        }
+        return False, {"message": str(e), "field": None}
+
 
 # --- FUNCTION UTILITIES ---
 
@@ -394,12 +494,12 @@ def to_dot_dict(obj):
     return obj
 
 
-def execute_function(func_data: Dict, params: Dict) -> Any:
+def execute_function(func_data: Dict, params: Dict, project_id: str) -> Any:
     body = func_data.get("body", "")
     resources = func_data.get("resources", [])
     available_data = {}
     for res in resources:
-        data_list = get_resource_data(res)
+        data_list = get_resource_data(res, project_id)
         available_data[res] = [to_dot_dict(item) for item in data_list]
 
     params = to_dot_dict(params)  # type: ignore
@@ -681,20 +781,15 @@ async def get_open_api_endpoint(resource: str):
 
 
 @app.get("/api/v1/resources")
-async def list_resources():
-    files = glob.glob(os.path.join(DATA_DIR, "*.json"))
-    resources = [os.path.basename(f).replace(".json", "") for f in files]
-    return sorted(resources)
+async def list_resources(project_id: str = Depends(get_project_id)):
+    return list_project_resources(project_id)
 
 
 @app.delete("/api/v1/resources/{resource}")
-async def delete_resource_file(resource: str):
-    path = os.path.join(DATA_DIR, f"{resource}.json")
-    schema_path = os.path.join(SCHEMA_DIR, f"{resource}.json")
-    if os.path.exists(path):
-        os.remove(path)
-    if os.path.exists(schema_path):
-        os.remove(schema_path)
+async def delete_resource_file(
+    resource: str, project_id: str = Depends(get_project_id)
+):
+    delete_project_resource(resource, project_id)
     return {"message": "Resource Deleted"}
 
 
@@ -842,20 +937,28 @@ async def delete_func(name: str):
 
 
 @app.post("/api/v1/functions/{name}/run")
-async def run_function(name: str, params: Dict = Body(default={})):
+async def run_function(
+    name: str,
+    params: Dict = Body(default={}),
+    project_id: str = Depends(get_project_id),
+):
     func_data = get_function(name)
     if not func_data:
         raise HTTPException(status_code=404, detail="Function not found")
-    result = execute_function(func_data, params)
+    result = execute_function(func_data, params, project_id)
     return result
 
 
 @app.post("/api/v1/functions/{name}/test")
-async def test_function(name: str, params: Dict = Body(default={})):
+async def test_function(
+    name: str,
+    params: Dict = Body(default={}),
+    project_id: str = Depends(get_project_id),
+):
     func_data = get_function(name)
     if not func_data:
         raise HTTPException(status_code=404, detail="Function not found")
-    result = execute_function(func_data, params)
+    result = execute_function(func_data, params, project_id)
     return result
 
 
@@ -863,8 +966,8 @@ async def test_function(name: str, params: Dict = Body(default={})):
 
 
 @app.get("/api/v1/r/{resource}/schema")
-async def get_schema(resource: str):
-    schema = get_resource_schema(resource)
+async def get_schema(resource: str, project_id: str = Depends(get_project_id)):
+    schema = get_resource_schema(resource, project_id)
     if schema is None:
         raise HTTPException(
             status_code=404, detail="No schema defined for this resource"
@@ -873,18 +976,20 @@ async def get_schema(resource: str):
 
 
 @app.put("/api/v1/r/{resource}/schema")
-async def set_schema(resource: str, schema: Dict = Body(...)):
+async def set_schema(
+    resource: str, schema: Dict = Body(...), project_id: str = Depends(get_project_id)
+):
     try:
         jsonschema.Draft7Validator.check_schema(schema)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid schema: {e}")
-    save_resource_schema(resource, schema)
+    save_resource_schema(resource, project_id, schema)
     return {"status": "ok"}
 
 
 @app.delete("/api/v1/r/{resource}/schema")
-async def delete_schema(resource: str):
-    delete_resource_schema(resource)
+async def delete_schema(resource: str, project_id: str = Depends(get_project_id)):
+    delete_resource_schema(resource, project_id)
     return {"status": "ok"}
 
 
@@ -892,14 +997,22 @@ async def delete_schema(resource: str):
 
 
 @app.get("/api/v1/r/{resource}")
-async def read_all(resource: str, filter: Optional[str] = Query(None)):
-    data = get_resource_data(resource)
+async def read_all(
+    resource: str,
+    filter: Optional[str] = Query(None),
+    project_id: str = Depends(get_project_id),
+):
+    data = get_resource_data(resource, project_id)
     return apply_complex_filter(data, filter) if filter else data
 
 
 @app.post("/api/v1/r/{resource}")
-async def create_item(resource: str, item: Dict[str, Any] = Body(...)):
-    schema = get_resource_schema(resource)
+async def create_item(
+    resource: str,
+    item: Dict[str, Any] = Body(...),
+    project_id: str = Depends(get_project_id),
+):
+    schema = get_resource_schema(resource, project_id)
     if schema:
         valid, error = validate_against_schema(item, schema)
         if not valid:
@@ -915,18 +1028,20 @@ async def create_item(resource: str, item: Dict[str, Any] = Body(...)):
                             "path": error.get("path"),
                             "validator": error.get("validator"),
                         }
-                    ]
-                }
+                    ],
+                },
             )
-    data = get_resource_data(resource)
+    data = get_resource_data(resource, project_id)
     data.append(item)
-    save_resource_data(resource, data)
+    save_resource_data(resource, project_id, data)
     return {"status": "ok"}
 
 
 @app.post("/api/v1/r/{resource}/bulk/update")
-async def bulk_overwrite(resource: str, items: Any = Body(...)):
-    schema = get_resource_schema(resource)
+async def bulk_overwrite(
+    resource: str, items: Any = Body(...), project_id: str = Depends(get_project_id)
+):
+    schema = get_resource_schema(resource, project_id)
 
     errors = []
 
@@ -934,32 +1049,32 @@ async def bulk_overwrite(resource: str, items: Any = Body(...)):
         for i, item in enumerate(items):
             valid, error = validate_against_schema(item, schema)
             if not valid:
-                errors.append({
-                    "index": i,
-                    "message": error.get("message"),
-                    "field": error.get("field"),
-                    "path": error.get("path"),
-                    "validator": error.get("validator"),
-                    "item": item
-                })
+                errors.append(
+                    {
+                        "index": i,
+                        "message": error.get("message"),
+                        "field": error.get("field"),
+                        "path": error.get("path"),
+                        "validator": error.get("validator"),
+                        "item": item,
+                    }
+                )
 
     if errors:
         raise HTTPException(
-            status_code=400,
-            detail={
-                "message": "Validation failed",
-                "errors": errors
-            }
+            status_code=400, detail={"message": "Validation failed", "errors": errors}
         )
 
-    save_resource_data(resource, items)
+    save_resource_data(resource, project_id, items)
 
     return {"status": "ok"}
 
 
 @app.get("/api/v1/r/{resource}/{item_id}")
-async def read_one(resource: str, item_id: str):
-    data = get_resource_data(resource)
+async def read_one(
+    resource: str, item_id: str, project_id: str = Depends(get_project_id)
+):
+    data = get_resource_data(resource, project_id)
     item = next((i for i in data if str(i.get("id")) == item_id), None)
     if not item:
         raise HTTPException(status_code=404)
@@ -968,9 +1083,12 @@ async def read_one(resource: str, item_id: str):
 
 @app.put("/api/v1/r/{resource}/{item_id}")
 async def update_item(
-    resource: str, item_id: str, updated_item: Dict[str, Any] = Body(...)
+    resource: str,
+    item_id: str,
+    updated_item: Dict[str, Any] = Body(...),
+    project_id: str = Depends(get_project_id),
 ):
-    schema = get_resource_schema(resource)
+    schema = get_resource_schema(resource, project_id)
     if schema:
         valid, error = validate_against_schema(updated_item, schema)
         if not valid:
@@ -986,25 +1104,28 @@ async def update_item(
                             "path": error.get("path"),
                             "validator": error.get("validator"),
                         }
-                    ]
-                }
+                    ],
+                },
             )
-    data = get_resource_data(resource)
+    data = get_resource_data(resource, project_id)
     for i, item in enumerate(data):
         if str(item.get("id")) == item_id:
             data[i] = updated_item
-            save_resource_data(resource, data)
+            save_resource_data(resource, project_id, data)
             return updated_item
     raise HTTPException(status_code=404)
 
 
 @app.patch("/api/v1/r/{resource}/{item_id}")
 async def patch_item(
-    resource: str, item_id: str, patch_data: Dict[str, Any] = Body(...)
+    resource: str,
+    item_id: str,
+    patch_data: Dict[str, Any] = Body(...),
+    project_id: str = Depends(get_project_id),
 ):
-    schema = get_resource_schema(resource)
+    schema = get_resource_schema(resource, project_id)
     if schema:
-        current_data = get_resource_data(resource)
+        current_data = get_resource_data(resource, project_id)
         item = next((i for i in current_data if str(i.get("id")) == item_id), None)
         if not item:
             raise HTTPException(status_code=404)
@@ -1023,24 +1144,26 @@ async def patch_item(
                             "path": error.get("path"),
                             "validator": error.get("validator"),
                         }
-                    ]
-                }
+                    ],
+                },
             )
 
-    data = get_resource_data(resource)
+    data = get_resource_data(resource, project_id)
     for i, item in enumerate(data):
         if str(item.get("id")) == item_id:
             data[i] = {**item, **patch_data}
-            save_resource_data(resource, data)
+            save_resource_data(resource, project_id, data)
             return data[i]
     raise HTTPException(status_code=404)
 
 
 @app.delete("/api/v1/r/{resource}/{item_id}")
-async def delete_item(resource: str, item_id: str):
-    data = get_resource_data(resource)
+async def delete_item(
+    resource: str, item_id: str, project_id: str = Depends(get_project_id)
+):
+    data = get_resource_data(resource, project_id)
     new_data = [item for item in data if str(item.get("id")) != item_id]
-    save_resource_data(resource, new_data)
+    save_resource_data(resource, project_id, new_data)
     return {"message": "Deleted"}
 
 
@@ -1088,6 +1211,11 @@ async def websocket_logs(websocket):
 # --- UI ROUTES ---
 
 
+@app.get("/resources")
+async def resources_ui():
+    return FileResponse("resource.html")
+
+
 @app.get("/functions")
 async def functions_ui():
     return FileResponse("functions.html")
@@ -1101,3 +1229,71 @@ async def logs_ui():
 @app.get("/")
 async def ui():
     return FileResponse("index.html")
+
+
+# --- PROJECT ROUTES ---
+
+
+@app.get("/api/v1/projects")
+async def list_projects_endpoint():
+    return list_projects()
+
+
+@app.post("/api/v1/projects")
+async def create_project(project: Dict = Body(...)):
+    project_id = project.get("id", "").strip()
+    if not project_id:
+        raise HTTPException(status_code=400, detail="Project ID is required")
+    if not re.match(r"^[a-zA-Z0-9_-]+$", project_id):
+        raise HTTPException(status_code=400, detail="Invalid project ID")
+    if get_project(project_id):
+        raise HTTPException(status_code=400, detail="Project already exists")
+
+    from datetime import datetime
+
+    project_data = {
+        "id": project_id,
+        "title": project.get("title", ""),
+        "description": project.get("description", ""),
+        "created": datetime.now().isoformat(),
+    }
+    save_project(project_id, project_data)
+    ensure_project_dir(project_id)
+    return {"status": "ok", "id": project_id}
+
+
+@app.get("/api/v1/projects/{project_id}")
+async def get_project_endpoint(project_id: str):
+    project = get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {
+        "id": project_id,
+        "title": project.get("title", ""),
+        "description": project.get("description", ""),
+        "created": project.get("created", ""),
+    }
+
+
+@app.put("/api/v1/projects/{project_id}")
+async def update_project_endpoint(project_id: str, project: Dict = Body(...)):
+    existing = get_project(project_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    project_data = {
+        "id": project_id,
+        "title": project.get("title", existing.get("title", "")),
+        "description": project.get("description", existing.get("description", "")),
+        "created": existing.get("created", ""),
+    }
+    save_project(project_id, project_data)
+    return {"status": "ok"}
+
+
+@app.delete("/api/v1/projects/{project_id}")
+async def delete_project_endpoint(project_id: str):
+    if not get_project(project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
+    delete_project(project_id)
+    return {"status": "ok"}

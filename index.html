@@ -1,1823 +1,391 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-    <title>Quick API Mock JSON</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <title>MockAPI - Project Selection</title>
     <style>
         :root {
             --bg: #1e1e1e;
             --panel: #252526;
-            --sidebar: #333333;
             --accent: #007acc;
+            --text: #cccccc;
             --border: #444;
         }
-
         body {
             margin: 0;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
             font-family: 'Segoe UI', sans-serif;
             background: var(--bg);
-            color: #cccccc;
-            overflow: hidden;
+            color: var(--text);
+            min-height: 100vh;
         }
-
-        #toolbar {
-            height: 40px;
-            padding: 0 20px;
+        .container {
+            max-width: 900px;
+            margin: 60px auto;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #888;
+            margin-bottom: 40px;
+        }
+        .project-card {
             background: var(--panel);
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
-        }
-
-        #main {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
-
-        #sidebar {
-            width: 240px;
-            background: var(--panel);
-            border-right: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        #sidebar-header {
-            padding: 12px;
-            border-bottom: 1px solid var(--border);
-            font-size: 11px;
-            font-weight: bold;
-            text-transform: uppercase;
-            color: #666;
-            letter-spacing: 1px;
-        }
-
-        #new-resource-zone {
-            padding: 10px;
-            display: flex;
-            gap: 5px;
-            background: #2d2d2d;
-        }
-
-        #resource-list {
-            flex: 1;
-            overflow-y: auto;
-        }
-
-        .resource-item {
-            padding: 8px 15px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
             cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 13px;
-            transition: 0.1s;
-        }
-
-        .resource-item:hover {
-            background: #2a2d2e;
-        }
-
-        .resource-item.active {
-            background: #37373d;
-            color: white;
-            border-left: 3px solid var(--accent);
-        }
-
-        .item-actions {
-            display: flex;
-            gap: 8px;
-            opacity: 0.4;
             transition: 0.2s;
         }
-
-        .resource-item:hover .item-actions {
-            opacity: 1;
+        .project-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
         }
-
-        .action-link {
-            text-decoration: none;
-            font-size: 10px;
-            color: var(--accent);
-            font-weight: bold;
-        }
-
-        .btn-del {
-            color: #888;
-            font-weight: bold;
-            padding: 0 4px;
-            cursor: pointer;
-        }
-
-        .btn-del:hover {
-            color: #ff4444;
-        }
-
-        #content-area {
-            flex: 1;
+        .project-header {
             display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            position: relative;
+            justify-content: space-between;
+            align-items: flex-start;
         }
-
-        #content-area>#empty-state {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-        }
-
-        #editor {
-            flex: 1;
-            min-height: 0;
-        }
-
-        #table-view {
-            flex: 1;
-            display: none;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        #side-panel {
-            width: 380px;
-            background: var(--panel);
-            display: flex;
-            flex-direction: column;
-            border-left: 1px solid var(--border);
-            transition: margin-right 0.3s ease;
-            overflow-y: auto;
-            overflow-x: hidden;
-            flex-shrink: 0;
-        }
-
-        #side-panel.hidden {
-            margin-right: -380px;
-        }
-
-        .panel-header {
-            padding: 10px 15px;
-            background: #2d2d2d;
-            font-size: 11px;
+        .project-title {
+            font-size: 18px;
             font-weight: bold;
-            color: #888;
-            border-bottom: 1px solid var(--border);
-        }
-
-        input,
-        select,
-        textarea {
-            background: #3c3c3c;
             color: white;
-            border: 1px solid var(--border);
-            padding: 4px 8px;
-            border-radius: 2px;
-            outline: none;
-            font-size: 12px;
         }
-
-        button {
-            background: var(--accent);
-            color: white;
-            border: none;
-            padding: 5px 12px;
-            border-radius: 2px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-
-        button:hover {
-            filter: brightness(1.2);
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .status-msg {
-            font-size: 11px;
+        .project-desc {
+            margin-top: 8px;
             color: #888;
-            margin-left: auto;
+            font-size: 14px;
         }
-
-        .view-btn {
-            background: #444;
+        .project-meta {
+            margin-top: 12px;
+            font-size: 12px;
+            color: #666;
         }
-
-        .view-btn.active {
-            background: var(--accent);
-        }
-
-        .crud-toolbar {
-            padding: 10px;
-            background: #2d2d2d;
+        .project-actions {
             display: flex;
             gap: 10px;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
         }
-
-        #data-table {
-            width: 100%;
-            border-collapse: collapse;
-            table-layout: fixed;
-        }
-
-        #data-table th {
-            background: #2d2d2d;
-            padding: 8px;
-            text-align: left;
+        .project-actions button {
+            background: #444;
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
             font-size: 12px;
-            font-weight: bold;
-            color: #888;
-            border-bottom: 1px solid var(--border);
-            position: sticky;
-            top: 0;
         }
-
-        #data-table td {
-            padding: 6px 8px;
-            border-bottom: 1px solid #333;
-            font-size: 12px;
-            vertical-align: top;
+        .project-actions button:hover {
+            background: #555;
         }
-
-        #data-table tr:hover {
-            background: #2a2d2e;
-        }
-
-        .table-container {
-            flex: 1;
-            overflow: auto;
-        }
-
-        #filter-input {
-            width: 200px;
-        }
-
-        .btn-save {
-            background: #28a745;
-        }
-
-        .btn-cancel {
-            background: #666;
-        }
-
-        .btn-edit {
-            background: #007bff;
-        }
-
-        .btn-delete {
+        .project-actions button.delete {
             background: #dc3545;
         }
-
-        .btn-add {
-            background: #28a745;
+        .project-actions button.delete:hover {
+            background: #c82333;
         }
-
-        .action-btns {
-            display: flex;
-            gap: 4px;
+        .create-form {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
         }
-
-        .action-btns button {
-            padding: 3px 8px;
-            font-size: 11px;
+        .create-form h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
         }
-
-        #schema-modal,
-        #item-modal {
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+            color: #888;
+        }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .form-group textarea {
+            height: 80px;
+            resize: vertical;
+        }
+        .btn-primary {
+            background: var(--accent);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary:hover {
+            background: #0098ff;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: #666;
+        }
+        .empty-state h2 {
+            margin-bottom: 10px;
+        }
+        #edit-modal {
             display: none;
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0,0,0,0.7);
             z-index: 1000;
             justify-content: center;
             align-items: center;
         }
-
-        #error-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        #schema-modal>div,
-        #item-modal>div,
-        #error-modal>div {
+        #edit-modal > div {
             background: var(--panel);
-            padding: 20px;
-            border-radius: 4px;
-            width: 700px;
-            max-height: 85vh;
+            padding: 25px;
+            border-radius: 8px;
+            width: 500px;
+        }
+        #edit-modal h3 {
+            margin-top: 0;
+        }
+        #edit-modal .modal-actions {
             display: flex;
-            flex-direction: column;
-            gap: 15px;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
         }
-
-        #error-modal>div {
-            width: 800px;
-            border: 2px solid #dc3545;
+        #edit-modal .btn-cancel {
+            background: #444;
         }
-
-        .error-item {
-            background: rgba(220, 53, 69, 0.1);
-            border: 1px solid #dc3545;
-            border-radius: 4px;
-            padding: 12px;
-            margin-bottom: 10px;
-        }
-
-        .error-item-header {
-            font-weight: bold;
-            color: #dc3545;
-            margin-bottom: 8px;
-        }
-
-        .error-item-details {
-            font-size: 13px;
-            color: var(--text);
-            margin-bottom: 8px;
-        }
-
-        .error-item pre {
-            background: #1e1e1e;
-            padding: 10px;
-            border-radius: 4px;
-            overflow-x: auto;
-            font-size: 11px;
-            margin: 5px 0 0 0;
-        }
-
-        .json-highlight {
-            background: #dc3545;
-            color: white;
-            padding: 2px 4px;
-            border-radius: 3px;
-            font-weight: bold;
-        }
-
-        .modal-header {
+        .header-bar {
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            padding: 15px 30px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-
-        .modal-header h3 {
+        .header-bar h2 {
             margin: 0;
-            font-size: 14px;
-            color: white;
+            font-size: 18px;
         }
-
-        .modal-body {
-            flex: 1;
-            overflow: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .modal-footer {
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-            padding-top: 10px;
-            border-top: 1px solid var(--border);
-        }
-
-        .view-toggle {
-            display: flex;
-            gap: 5px;
-            margin-bottom: 10px;
-        }
-
-        .view-toggle button {
-            padding: 4px 12px;
-            font-size: 11px;
-        }
-
-        .view-toggle button.active {
-            background: var(--accent);
-        }
-
-        #json-editor-container {
-            flex: 1;
-            min-height: 300px;
-            border: 1px solid var(--border);
-            display: none;
-        }
-
-        #json-editor-container.show {
-            display: block;
-        }
-
-        #form-editor {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        #form-editor.show {
-            display: flex;
-        }
-
-        .field-row {
-            display: flex;
-            gap: 10px;
-            align-items: flex-start;
-            padding: 5px 0;
-            border-bottom: 1px solid #333;
-        }
-
-        .field-row input {
-            flex: 1;
-            min-width: 100px;
-        }
-
-        .field-row textarea {
-            flex: 2;
-            min-width: 150px;
-            min-height: 36px;
-            resize: vertical;
-            font-family: 'Consolas', monospace;
-            font-size: 12px;
-        }
-
-        .field-row .btn-remove {
-            background: #dc3545;
-            padding: 4px 8px;
-            font-size: 11px;
-            align-self: center;
-        }
-
-        .add-field-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px dashed var(--border);
-        }
-
-        .add-field-row input {
-            flex: 1;
-        }
-
-        .json-error {
-            background: rgba(220, 53, 69, 0.1);
-            color: #dc3545;
-            padding: 10px;
-            border-radius: 4px;
-            font-size: 12px;
-            margin-top: 10px;
-        }
-
-        .editor-error-line {
-            background: rgba(220, 53, 69, 0.2) !important;
-        }
-
-        .editor-error-glyph {
-            background: #dc3545;
-            border-radius: 50%;
-            margin-left: 3px;
+        .header-bar a {
+            color: var(--accent);
+            text-decoration: none;
         }
     </style>
 </head>
-
 <body>
-    <div id="toolbar">
-        <a href="/functions" style="color: var(--accent); text-decoration: none; font-weight: bold;">⚡ Functions</a>
-        <a href="/logs" style="color: var(--accent); text-decoration: none; font-weight: bold;">📋 Logs</a>
-        <strong>QUICK API MOCK</strong>
-        <span id="current-file-label" style="color: #61afef; font-size: 13px; font-family: monospace;"></span>
-        <div style="margin-right: 10px; display: flex; gap: 5px;">
-            <button class="view-btn active" onclick="switchView('editor')" id="editor-btn">Editor</button>
-            <button class="view-btn" onclick="switchView('table')" id="table-btn">Table</button>
+    <div class="header-bar">
+        <h2>MockAPI</h2>
+        <a href="/resources">Go to Resources →</a>
+    </div>
+    <div class="container">
+        <h1>Projects</h1>
+        <p class="subtitle">Manage your API mock projects. Each project has its own resources and data.</p>
+
+        <div class="create-form">
+            <h3>Create New Project</h3>
+            <div class="form-group">
+                <label>Project ID</label>
+                <input type="text" id="project-id" placeholder="my-project">
+            </div>
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" id="project-title" placeholder="My Awesome Project">
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="project-desc" placeholder="A brief description of this project..."></textarea>
+            </div>
+            <button class="btn-primary" onclick="createProject()">Create Project</button>
         </div>
-        <button onclick="refreshData()" id="refresh-btn" style="background: #17a2b7;">Refresh</button>
-        <button onclick="saveFullFile()" id="save-btn" style="background: #28a745; display: inline-block;">Save
-            (Ctrl+S)</button>
-        <button onclick="openSchemaModal()" id="schema-btn" style="background: #6f42c1;">Set Schema</button>
-        <span id="schema-indicator" class="status-msg" style="color: #6f42c1;"></span>
-        <span id="status" class="status-msg"></span>
-        <div style="margin-left: auto; display: flex; gap: 5px;">
-            <button onclick="toggleSidePanel()" id="toggle-panel-btn" style="background: #666;">Transform ▶</button>
-        </div>
+
+        <div id="project-list"></div>
     </div>
 
-    <div id="banner-modal"
-        style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:2000;justify-content:center;align-items:center;flex-direction:column;">
-        <div id="banner-carousel"
-            style="max-width:800px;max-height:400px;background:var(--panel);border-radius:8px;overflow:hidden;position:relative;">
-            <div id="banner-content"
-                style="display:flex;align-items:center;justify-content:center;height:100%;min-height:300px;"></div>
-            <div id="banner-dots"
-                style="position:absolute;bottom:15px;left:0;right:0;display:flex;justify-content:center;gap:8px;"></div>
-            <button onclick="closeBannerModal()"
-                style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.5);border:none;color:white;padding:8px 12px;border-radius:4px;cursor:pointer;">✕
-                Close</button>
-        </div>
-        <div style="margin-top:15px;text-align:center;">
-            <button onclick="closeBannerModal()"
-                style="background:var(--accent);border:none;color:white;padding:10px 30px;border-radius:4px;cursor:pointer;font-size:14px;">OK,
-                got it!</button>
-        </div>
-    </div>
-
-    <div id="error-modal">
+    <div id="edit-modal">
         <div>
-            <div class="modal-header">
-                <h3>⚠️ Validation Error</h3>
-                <button onclick="closeErrorModal()" style="background:#444;">✕</button>
+            <h3>Edit Project</h3>
+            <input type="hidden" id="edit-id">
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" id="edit-title">
             </div>
-            <div id="error-modal-message" style="color: #dc3545; font-weight: bold;"></div>
-            <div id="error-modal-body" class="modal-body"></div>
-            <div class="modal-footer">
-                <button onclick="closeErrorModal()" style="background:#6c757d;">Close</button>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="edit-desc"></textarea>
             </div>
-        </div>
-    </div>
-
-    <div id="schema-modal">
-        <div>
-            <div class="modal-header">
-                <h3>JSON Schema for <span id="schema-resource-name"></span></h3>
-                <button onclick="closeSchemaModal()" style="background:#444;">✕</button>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeEditModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveEdit()">Save</button>
             </div>
-            <div id="schema-editor" style="flex:1;min-height:300px;border:1px solid var(--border);"></div>
-            <div class="modal-footer">
-                <button onclick="deleteSchema()" style="background:#dc3545;">Delete Schema</button>
-                <button onclick="saveSchema()" style="background:#28a745;">Save Schema</button>
-            </div>
-            <div id="schema-status" class="status-msg"></div>
-        </div>
-    </div>
-
-    <div id="item-modal">
-        <div>
-            <div class="modal-header">
-                <h3 id="item-modal-title">Item</h3>
-                <button onclick="closeItemModal()" style="background:#444;">✕</button>
-            </div>
-            <div class="view-toggle">
-                <button id="form-view-btn" class="active" onclick="switchItemView('form')">Form</button>
-                <button id="json-view-btn" onclick="switchItemView('json')">JSON</button>
-            </div>
-            <div class="modal-body">
-                <div id="error-banner"
-                    style="display:none; background: #dc3545; color: white; padding: 15px; margin-bottom: 15px; border-radius: 4px; font-weight: bold;">
-                    <div id="error-banner-text"></div>
-                    <div id="field-errors" style="margin-top: 10px; font-size: 12px;"></div>
-                </div>
-                <div id="form-editor" class="show"></div>
-                <div id="json-editor-container"></div>
-            </div>
-            <div class="modal-footer">
-                <div id="item-error" class="json-error"
-                    style="display:none; margin-top: 10px; cursor: pointer; background: #dc3545; color: white; padding: 8px 12px; border-radius: 4px; font-weight: bold;"
-                    onclick="showItemErrorModal()"></div>
-                <button onclick="closeItemModal()" style="background:#666;">Cancel</button>
-                <button onclick="saveItem()" style="background:#28a745;">Save</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="main">
-        <div id="sidebar">
-            <div id="sidebar-header">Resources</div>
-            <div id="new-resource-zone">
-                <input type="text" id="new-proj-input" placeholder="resource_name..." style="width:100%;">
-                <button onclick="createNewProject()">+</button>
-            </div>
-            <div style="padding:8px;">
-                <input type="text" id="resource-search" placeholder="Search resources..." style="width:100%;"
-                    oninput="filterResources(this.value)">
-            </div>
-            <div id="resource-list"></div>
-        </div>
-
-        <div id="content-area">
-            <div id="empty-state"
-                style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;color:#666;flex-direction:column;">
-                <div style="font-size:48px;opacity:0.3;">📋</div>
-                <div style="text-align:center;">
-                    <div style="font-size:18px;margin-bottom:10px;">No Resource Selected</div>
-                    <div style="font-size:13px;">Create a new resource or select one from the sidebar to edit</div>
-                </div>
-            </div>
-            <div id="editor" style="display:none;"></div>
-
-            <div id="table-view">
-                <div class="crud-toolbar">
-                    <input type="text" id="filter-input"
-                        placeholder="Filter: name fuzzy 'john' or _.filter(data, {status: 'Active'})"
-                        oninput="applyFilter()">
-                    <button onclick="showFilterHelp()" style="background:#666;padding:5px 8px;"
-                        title="Filter Help">?</button>
-                    <button onclick="openAddModal()" style="background:#28a745;">+ Add</button>
-                    <span id="row-count" style="margin-left:auto;font-size:11px;color:#888;"></span>
-                </div>
-
-                <div id="filter-help"
-                    style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--panel);padding:20px;border-radius:4px;z-index:2000;min-width:400px;border:1px solid var(--border);">
-                    <div style="display:flex;justify-content:space-between;margin-bottom:15px;">
-                        <strong style="color:white;">Filter Syntax Help</strong>
-                        <button onclick="document.getElementById('filter-help').style.display='none'"
-                            style="background:#444;padding:2px 8px;">✕</button>
-                    </div>
-                    <div style="font-size:12px;line-height:1.8;color:#ccc;">
-                        <p><strong style="color:#6f42c1;">Lodash:</strong></p>
-                        <code
-                            style="background:#333;padding:2px 4px;border-radius:2px;">_.filter(data, {status: 'Active'})</code><br>
-                        <code
-                            style="background:#333;padding:2px 4px;border-radius:2px;">_.filter(data, {role: 'admin'})</code><br>
-                        <code
-                            style="background:#333;padding:2px 4px;border-radius:2px;">_.filter(data, {active: true})</code>
-                        <p><strong style="color:#6f42c1;">Arrow functions:</strong></p>
-                        <code
-                            style="background:#333;padding:2px 4px;border-radius:2px;">data.filter(i => i.age > 21)</code><br>
-                        <code
-                            style="background:#333;padding:2px 4px;border-radius:2px;">data.filter(i => i.name.startsWith('A'))</code>
-                        <p><strong style="color:#6f42c1;">Simple (text search):</strong></p>
-                        <code style="background:#333;padding:2px 4px;border-radius:2px;">Active</code><br>
-                        <code style="background:#333;padding:2px 4px;border-radius:2px;">admin</code>
-                        <p><strong style="color:#6f42c1;">Field operators:</strong></p>
-                        <code style="background:#333;padding:2px 4px;border-radius:2px;">status == Active</code><br>
-                        <code style="background:#333;padding:2px 4px;border-radius:2px;">age &gt; 21</code><br>
-                        <code
-                            style="background:#333;padding:2px 4px;border-radius:2px;">stock.quantity &gt; 5</code><br>
-                        <code style="background:#333;padding:2px 4px;border-radius:2px;">name fuzzy "john"</code><br>
-                        <code style="background:#333;padding:2px 4px;border-radius:2px;">name regex "^ad"</code>
-                    </div>
-                </div>
-                <div class="table-container">
-                    <table id="data-table">
-                        <thead id="table-header"></thead>
-                        <tbody id="table-body"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div id="side-panel">
-            <div class="panel-header">TRANSFORMATION (LODASH SUPPORTED)</div>
-            <div style="padding:15px;display:flex;flex-direction:column;gap:10px;">
-                <input type="text" id="query" placeholder="_.filter(data, {status: 'Active'})" oninput="runTransform()">
-                <div style="display:flex;gap:8px;">
-                    <button onclick="saveQuery()" style="flex:1;background:#444;">Cache</button>
-                    <select id="queryHistory" onchange="loadQuery(this.value)" style="flex:2;">
-                        <option value="">Recent Queries...</option>
-                    </select>
-                </div>
-            </div>
-            <div class="panel-header">RESULT PREVIEW</div>
-            <pre id="output" style="flex:1;overflow:auto;min-height:0;"></pre>
         </div>
     </div>
 
     <script>
-        let editor, itemEditor, schemaEditor;
-        let activeProject = '';
-        let currentView = 'editor';
-        let tableData = [];
-        let filteredData = [];
-        let currentFilter = '';
-        let schemaFields = [];
-        let itemMode = 'add';
-        let editIndex = null;
-        let itemViewMode = 'form';
-        let sidePanelVisible = true;
-        const CACHE_KEY = 'json_transform_cache';
-        let bannerImages = [];
-        let currentBannerIndex = 0;
-        let bannerInterval = null;
-        let schemaCache = {};
+        let projects = [];
 
-        require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
-        require(['vs/editor/editor.main'], function () {
-            editor = monaco.editor.create(document.getElementById('editor'), {
-                value: "[]",
-                language: 'json',
-                theme: 'vs-dark',
-                automaticLayout: true,
-                fontSize: 13,
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                lineNumbersMinChars: 3
-            });
-
-            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => saveFullFile());
-
-            updateHistoryUI();
-            refreshProjectList().then(() => {
-                const lastProj = localStorage.getItem('last_active_resource');
-                if (lastProj) loadProject(lastProj);
-            });
-            loadBanners();
-        });
-
-        async function refreshProjectList() {
-            try {
-                const res = await fetch('/api/v1/resources');
-                const resources = await res.json();
-                window.allResources = resources;
-                filterResources(document.getElementById('resource-search').value);
-            } catch (e) { console.error(e); }
+        async function loadProjects() {
+            const res = await fetch('/api/v1/projects');
+            projects = await res.json();
+            renderProjects();
         }
 
-        function filterResources(query) {
-            const resources = window.allResources || [];
-            const filtered = query
-                ? resources.filter(r => r.toLowerCase().includes(query.toLowerCase()))
-                : resources;
+        function renderProjects() {
+            const list = document.getElementById('project-list');
+            if (projects.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <h2>No projects yet</h2>
+                        <p>Create your first project above to get started.</p>
+                    </div>
+                `;
+                return;
+            }
 
-            document.getElementById('resource-list').innerHTML = filtered.map(p => `
-                <div class="resource-item ${p === activeProject ? 'active' : ''}" onclick="loadProject('${p}')">
-                    <span>${p}.json</span>
-                    <div class="item-actions">
-                        <a href="/docs/${p}" target="_blank" class="action-link" onclick="event.stopPropagation()">DOCS</a>
-                        <span class="btn-del" onclick="event.stopPropagation(); deleteProject('${p}')">×</span>
+            list.innerHTML = projects.map(p => `
+                <div class="project-card" onclick="selectProject('${p.id}')">
+                    <div class="project-header">
+                        <div>
+                            <div class="project-title">${escapeHtml(p.title || p.id)}</div>
+                            <div class="project-desc">${escapeHtml(p.description || 'No description')}</div>
+                            <div class="project-meta">ID: ${escapeHtml(p.id)}</div>
+                        </div>
+                        <div class="project-actions" onclick="event.stopPropagation()">
+                            <button onclick="editProject('${p.id}')">Edit</button>
+                            <button class="delete" onclick="deleteProject('${p.id}')">Delete</button>
+                        </div>
                     </div>
                 </div>
             `).join('');
         }
 
-        async function createNewProject() {
-            const name = document.getElementById('new-proj-input').value.trim().replace('.json', '');
-            if (!name) return;
-            await fetch(`/api/v1/r/${name}/bulk/update`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: '[]'
-            });
-            document.getElementById('new-proj-input').value = '';
-            await refreshProjectList();
-            loadProject(name);
-        }
-
-        async function loadBanners() {
-            const modal = document.getElementById('banner-modal');
-            const content = document.getElementById('banner-content');
-            const dots = document.getElementById('banner-dots');
-
-            try {
-                const res = await fetch('/api/v1/banners');
-                bannerImages = await res.json();
-            } catch {
-                bannerImages = [];
-            }
-
-            if (bannerImages.length === 0) {
-                content.innerHTML = `
-                    <div style="padding:40px;text-align:center;max-width:600px;">
-                        <div style="font-size:48px;margin-bottom:20px;">🚀</div>
-                        <h2 style="color:white;margin-bottom:15px;">Welcome to Quick API Mock</h2>
-                        <p style="color:#aaa;line-height:1.8;">
-                            This application is designed to make mocking APIs as fast as possible.<br>
-                            You can perform CRUD operations on resources, create custom functions,<br>
-                            and test them all in one place.
-                        </p>
-                        <p style="color:#888;margin-top:20px;font-size:12px;">
-                            Start by creating a resource in the sidebar or go to <a href="/functions" style="color:var(--accent);">⚡ Functions</a> to create custom functions.
-                        </p>
-                    </div>
-                `;
-                dots.innerHTML = '<div class="banner-dot active"></div>';
-                modal.style.display = 'flex';
-                return;
-            }
-
-            showBanner(0);
-            modal.style.display = 'flex';
-            startBannerSlideshow();
-        }
-
-        function showBanner(index) {
-            currentBannerIndex = index;
-            const content = document.getElementById('banner-content');
-            const dots = document.getElementById('banner-dots');
-
-            content.innerHTML = `<img src="${bannerImages[index]}" alt="Banner ${index + 1}" style="max-width:100%;max-height:400px;">`;
-
-            dots.innerHTML = bannerImages.map((_, i) =>
-                `<div class="banner-dot ${i === index ? 'active' : ''}" onclick="showBanner(${i})"></div>`
-            ).join('');
-        }
-
-        function startBannerSlideshow() {
-            if (bannerInterval) clearInterval(bannerInterval);
-            bannerInterval = setInterval(() => {
-                currentBannerIndex = (currentBannerIndex + 1) % bannerImages.length;
-                showBanner(currentBannerIndex);
-            }, 5000);
-        }
-
-        function closeBannerModal() {
-            if (bannerInterval) clearInterval(bannerInterval);
-            document.getElementById('banner-modal').style.display = 'none';
-        }
-
-        function closeErrorModal() {
-            document.getElementById('error-modal').style.display = 'none';
-        }
-
-        function showErrorModal(errorData) {
-            console.log("errorData", errorData)
-            const modal = document.getElementById('error-modal');
-            const messageEl = document.getElementById('error-modal-message');
-            const bodyEl = document.getElementById('error-modal-body');
-
-            if (typeof errorData === 'string') {
-                messageEl.innerText = errorData;
-                bodyEl.innerHTML = '';
-            } else {
-                messageEl.innerText = errorData.message || 'Validation Error';
-                bodyEl.innerHTML = '';
-
-                if (errorData.errors && Array.isArray(errorData.errors)) {
-                    errorData.errors.forEach((err, idx) => {
-                        const itemDiv = document.createElement('div');
-                        itemDiv.className = 'error-item';
-
-                        let itemHtml = `<div class="error-item-header">Error #${idx + 1}: ${err.message || 'Unknown error'}</div>`;
-                        itemHtml += `<div class="error-item-details">`;
-                        if (err.field) itemHtml += `<div><strong>Field:</strong> ${err.field}</div>`;
-                        if (err.validator) itemHtml += `<div><strong>Validator:</strong> ${err.validator}</div>`;
-                        if (err.path && err.path.length) itemHtml += `<div><strong>Path:</strong> ${err.path.join('.')}</div>`;
-                        if (err.index !== undefined) itemHtml += `<div><strong>Index:</strong> ${err.index}</div>`;
-                        itemHtml += `</div>`;
-
-                        if (err.item) {
-                            const highlightedJson = highlightJsonPath(err.item, err.path);
-                            itemHtml += `<pre>${highlightedJson}</pre>`;
-                        } else if (err.path && err.path.length) {
-                            itemHtml += `<div class="error-item-details" style="color: #888; font-style: italic;">No item data available</div>`;
-                        }
-
-                        itemDiv.innerHTML = itemHtml;
-                        bodyEl.appendChild(itemDiv);
-                    });
-                    const jsonErrorRaw = document.createElement('pre');
-                    jsonErrorRaw.innerText = JSON.stringify(errorData, null, 2);
-
-                    jsonErrorRaw.style.border = "1px solid red";
-                    jsonErrorRaw.style.padding = "10px";
-                    jsonErrorRaw.style.borderRadius = "6px";
-
-                    bodyEl.appendChild(jsonErrorRaw);
-                } else {
-                    bodyEl.innerHTML = `<pre>${JSON.stringify(errorData, null, 2)}</pre>`;
-                }
-            }
-
-            modal.style.display = 'flex';
-        }
-
-        function highlightJsonPath(obj, path) {
-            if (!path || !path.length) return escapeHtml(JSON.stringify(obj, null, 2));
-
-            const json = JSON.stringify(obj, null, 2);
-            const targetField = path[0];
-            const lines = json.split('\n');
-            const result = [];
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const indent = line.match(/^(\s*)/)[1];
-                const keyMatch = line.match(/^(\s*)"([^"]+)"\s*:/);
-
-                if (keyMatch && keyMatch[2] === targetField) {
-                    if (path.length === 1) {
-                        result.push(line.replace(
-                            /("([^"]+)"\s*:\s*)(.*)/,
-                            `$1<span class="json-highlight">$3</span>`
-                        ));
-                    } else {
-                        result.push(line.replace(
-                            /("([^"]+)")/,
-                            `<span class="json-highlight">$1</span>`
-                        ));
-                    }
-                } else {
-                    result.push(line);
-                }
-            }
-
-            return result.join('\n');
-        }
-
         function escapeHtml(text) {
             const div = document.createElement('div');
-            div.textContent = text;
+            div.textContent = text || '';
             return div.innerHTML;
         }
 
-        async function deleteProject(name) {
-            if (!confirm(`Delete ${name}.json?`)) return;
-            await fetch(`/api/v1/resources/${name}`, { method: 'DELETE' });
-            if (activeProject === name) {
-                activeProject = '';
-                tableData = [];
-                filteredData = [];
-                document.getElementById('empty-state').style.display = 'flex';
-                document.getElementById('editor').style.display = 'none';
-                editor.setValue("[]");
-            }
-            refreshProjectList();
-        }
+        async function createProject() {
+            const id = document.getElementById('project-id').value.trim();
+            const title = document.getElementById('project-title').value.trim();
+            const description = document.getElementById('project-desc').value.trim();
 
-        async function loadProject(name) {
-            activeProject = name;
-            localStorage.setItem('last_active_resource', name);
-            document.getElementById('current-file-label').innerText = `/${name}.json`;
-
-            const res = await fetch(`/api/v1/r/${name}`);
-            const data = await res.json();
-
-            editor.setValue(JSON.stringify(data, null, 4));
-            tableData = data || [];
-            filteredData = [...tableData];
-
-            document.getElementById('empty-state').style.display = 'none';
-            document.getElementById('editor').style.display = currentView === 'editor' ? 'flex' : 'none';
-
-            if (currentView === 'table') renderTable();
-
-            refreshProjectList();
-            runTransform();
-        }
-
-        async function refreshData() {
-            if (!activeProject) return;
-
-            const [allRes, filteredRes] = await Promise.all([
-                fetch(`/api/v1/r/${activeProject}`),
-                fetch(`/api/v1/r/${activeProject}${document.getElementById('filter-input').value.trim() ? '?filter=' + encodeURIComponent(document.getElementById('filter-input').value.trim()) : ''}`)
-            ]);
-
-            const allData = await allRes.json();
-            const filtered = await filteredRes.json();
-
-            tableData = allData || [];
-            filteredData = filtered || [];
-
-            editor.setValue(JSON.stringify(tableData, null, 4));
-            renderTable();
-            document.getElementById('status').innerText = "🔄 Refreshed " + new Date().toLocaleTimeString();
-        }
-
-        function switchView(view) {
-            currentView = view;
-            document.getElementById('editor-btn').classList.toggle('active', view === 'editor');
-            document.getElementById('table-btn').classList.toggle('active', view === 'table');
-            document.getElementById('editor').style.display = view === 'editor' ? 'flex' : 'none';
-            document.getElementById('table-view').style.display = view === 'table' ? 'flex' : 'none';
-            document.getElementById('save-btn').style.display = view === 'editor' ? 'inline-block' : 'none';
-            document.getElementById('schema-btn').style.display = view === 'editor' ? 'inline-block' : 'none';
-            if (view === 'table') renderTable();
-        }
-
-        function renderTable() {
-            const dataToShow = filteredData || [];
-
-            if (dataToShow.length === 0) {
-                document.getElementById('table-header').innerHTML = '';
-                document.getElementById('table-body').innerHTML = '<tr><td colspan="100" style="text-align:center;color:#888;padding:20px;">No data</td></tr>';
-                document.getElementById('row-count').innerText = '';
+            if (!id) {
+                alert('Project ID is required');
                 return;
             }
 
-            const allKeys = new Set();
-            dataToShow.forEach(item => Object.keys(item).forEach(k => allKeys.add(k)));
-            const columns = ['id', ...Array.from(allKeys).filter(k => k !== 'id')];
-            schemaFields = columns;
-
-            document.getElementById('table-header').innerHTML = '<tr>' + columns.map(c => `<th>${c}</th>`).join('') + '<th style="width:150px;">Actions</th></tr>';
-
-            document.getElementById('table-body').innerHTML = dataToShow.map((item) => {
-                const originalIdx = tableData.findIndex(t => t.id === item.id);
-                return `<tr data-row-index="${originalIdx}">` + columns.map(col => {
-                    const val = item[col] !== undefined ? JSON.stringify(item[col]) : '';
-                    return `<td><span style="white-space:nowrap;text-overflow:ellipsis;overflow:hidden;display:block;">${escapeHtml(val)}</span></td>`;
-                }).join('') + `<td>
-                    <div class="action-btns">
-                        <button class="btn-edit" onclick="openViewModal(${originalIdx})">View</button>
-                        <button class="btn-edit" onclick="openEditModal(${originalIdx})">Edit</button>
-                        <button class="btn-delete" onclick="deleteRow(${originalIdx})">Del</button>
-                    </div>
-                </td></tr>`;
-            }).join('');
-
-            document.getElementById('row-count').innerText = `${dataToShow.length} rows`;
-        }
-
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        }
-
-        async function applyFilter() {
-            const filterQuery = document.getElementById('filter-input').value.trim();
-
-            try {
-                const url = filterQuery
-                    ? `/api/v1/r/${activeProject}?filter=${encodeURIComponent(filterQuery)}`
-                    : `/api/v1/r/${activeProject}`;
-
-                const res = await fetch(url);
-                if (res.ok) {
-                    filteredData = await res.json();
-                    renderTable();
-                }
-            } catch (e) {
-                console.error('Filter error:', e);
-            }
-        }
-
-        function openAddModal() {
-            itemMode = 'add';
-            editIndex = null;
-            document.getElementById('item-modal-title').innerText = 'Add Item';
-            document.getElementById('item-error').style.display = 'none';
-            document.getElementById('item-error').innerText = '';
-            window.lastItemError = null;
-            switchItemView('form');
-            renderFormEditor({});
-            document.getElementById('item-modal').style.display = 'flex';
-        }
-
-        function openViewModal(idx) {
-            itemMode = 'view';
-            editIndex = idx;
-            document.getElementById('item-modal-title').innerText = 'View Item';
-            document.getElementById('item-error').style.display = 'none';
-            window.lastItemError = null;
-            switchItemView('form');
-            renderFormEditor({ ...tableData[idx] }, true);
-            document.getElementById('item-modal').style.display = 'flex';
-        }
-
-        function openEditModal(idx) {
-            itemMode = 'edit';
-            editIndex = idx;
-            document.getElementById('item-modal-title').innerText = 'Edit Item';
-            document.getElementById('item-error').style.display = 'none';
-            window.lastItemError = null;
-            switchItemView('form');
-            renderFormEditor({ ...tableData[idx] }, false);
-            document.getElementById('item-modal').style.display = 'flex';
-        }
-
-        function closeItemModal() {
-            document.getElementById('item-modal').style.display = 'none';
-            document.getElementById('item-error').style.display = 'none';
-            window.lastItemError = null;
-            if (itemEditor) itemEditor.setValue('');
-        }
-
-        function switchItemView(view) {
-            itemViewMode = view;
-            document.getElementById('form-view-btn').classList.toggle('active', view === 'form');
-            document.getElementById('json-view-btn').classList.toggle('active', view === 'json');
-            document.getElementById('form-editor').classList.toggle('show', view === 'form');
-            document.getElementById('json-editor-container').classList.toggle('show', view === 'json');
-
-            if (view === 'json') {
-                if (!itemEditor) {
-                    itemEditor = monaco.editor.create(document.getElementById('json-editor-container'), {
-                        value: '{}',
-                        language: 'json',
-                        theme: 'vs-dark',
-                        automaticLayout: true,
-                        fontSize: 12,
-                        minimap: { enabled: false }
-                    });
-                }
-                let data;
-                if (itemMode === 'add') {
-                    data = {};
-                } else {
-                    data = itemMode === 'view' ? { ...tableData[editIndex] } : getFormData();
-                }
-                itemEditor.setValue(JSON.stringify(data, null, 2));
-            } else {
-                const jsonVal = itemEditor?.getValue() || '{}';
-                try {
-                    const data = JSON.parse(jsonVal);
-                    renderFormEditor(data, itemMode === 'view');
-                } catch (e) {
-                    console.log('Parse error:', e);
-                }
-            }
-        }
-
-        function renderFormEditor(data, readonly = false) {
-            const form = document.getElementById('form-editor');
-            const fields = Object.keys(data);
-
-            let html = fields.map(key => {
-                const val = data[key];
-                const valStr = typeof val === 'object' ? JSON.stringify(val, null, 2) : String(val);
-                const isObject = typeof val === 'object';
-                return `
-                    <div class="field-row" data-is-object="${isObject}">
-                        <input type="text" value="${escapeHtml(key)}" placeholder="key" data-field="key" ${readonly ? 'readonly' : ''} style="${readonly ? 'opacity:0.7' : ''}">
-                        <textarea placeholder="value" data-field="value" ${readonly ? 'readonly' : ''} style="flex:2;min-height:40px;resize:vertical;${readonly ? 'opacity:0.7;background:#2d2d2d' : ''}">${escapeHtml(valStr)}</textarea>
-                        ${isObject ? '<span style="color:#f0ad4e;font-size:10px;">obj</span>' : ''}
-                        ${readonly ? '' : `<button class="btn-remove" onclick="removeField(this)">×</button>`}
-                    </div>
-                `;
-            }).join('');
-
-            html += `
-                <div class="add-field-row">
-                    <input type="text" id="new-field-key" placeholder="new field name" ${readonly ? 'style="display:none"' : ''}>
-                    <select id="new-field-type" ${readonly ? 'style="display:none"' : ''}>
-                        <option value="string">String</option>
-                        <option value="number">Number</option>
-                        <option value="boolean">Boolean</option>
-                        <option value="array">Array []</option>
-                        <option value="object">Object {}</option>
-                    </select>
-                    <button onclick="addField()" ${readonly ? 'style="display:none"' : ''}>+ Add Field</button>
-                </div>
-            `;
-
-            form.innerHTML = html;
-        }
-
-        function addField() {
-            const key = document.getElementById('new-field-key').value.trim();
-            const type = document.getElementById('new-field-type')?.value || 'string';
-            if (!key) return;
-
-            let defaultVal = '';
-            let isObject = false;
-            switch (type) {
-                case 'array': defaultVal = '[]'; isObject = true; break;
-                case 'object': defaultVal = '{}'; isObject = true; break;
-                case 'number': defaultVal = '0'; break;
-                case 'boolean': defaultVal = 'true'; break;
-            }
-
-            const newRow = document.createElement('div');
-            newRow.className = 'field-row';
-            newRow.dataset.isObject = isObject;
-            newRow.innerHTML = `
-                <input type="text" value="${escapeHtml(key)}" placeholder="key" data-field="key">
-                <textarea placeholder="value" data-field="value" style="flex:2;min-height:40px;resize:vertical;">${escapeHtml(defaultVal)}</textarea>
-                ${isObject ? '<span style="color:#f0ad4e;font-size:10px;">obj</span>' : ''}
-                <button class="btn-remove" onclick="removeField(this)">×</button>
-            `;
-
-            const addRow = document.querySelector('.add-field-row');
-            addRow.before(newRow);
-            document.getElementById('new-field-key').value = '';
-        }
-
-        function removeField(btn) {
-            btn.closest('.field-row').remove();
-        }
-
-        function getFormData() {
-            const data = {};
-            document.querySelectorAll('#form-editor .field-row').forEach(row => {
-                const keyInput = row.querySelector('[data-field="key"]');
-                const valInput = row.querySelector('[data-field="value"]');
-                if (keyInput && valInput && keyInput.value) {
-                    const key = keyInput.value.trim();
-                    let val = valInput.value;
-                    if (val.trim()) {
-                        try { val = JSON.parse(val); } catch { val = val; }
-                    } else {
-                        val = undefined;
-                    }
-                    if (val !== undefined) data[key] = val;
-                }
-            });
-            return data;
-        }
-
-        async function validateItemData(data) {
-            let schema = schemaCache[activeProject];
-
-            if (!schema) {
-                try {
-                    const res = await fetch(`/api/v1/r/${activeProject}/schema`);
-                    if (res.ok) {
-                        schema = await res.json();
-                        schemaCache[activeProject] = schema;
-                        console.log('Schema loaded:', schema);
-                    }
-                } catch (e) {
-                    console.error('Failed to load schema:', e);
-                }
-            }
-
-            if (!schema) {
-                console.log('No schema found, skipping validation');
-                return { valid: true };
+            if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+                alert('Project ID can only contain letters, numbers, underscores, and hyphens');
+                return;
             }
 
             try {
-                const AjvCode = await fetch('https://cdn.jsdelivr.net/npm/ajv@8/dist/ajv.bundle.min.js').then(r => r.text());
-                const Ajv = eval(AjvCode);
-                const validator = new Ajv({ allErrors: true });
-                const validate = validator.compile(schema);
+                const res = await fetch('/api/v1/projects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, title, description })
+                });
 
-                if (!validate(data)) {
-                    const errors = validate.errors;
-                    console.log('Validation errors:', errors);
-                    const errorFields = errors.map(e => e.instancePath.replace('/', '') || 'root').filter(Boolean);
-                    return {
-                        valid: false,
-                        error: JSON.stringify(errors, null, 2),
-                        errors: errors,
-                        fields: [...new Set(errorFields)]
-                    };
-                }
-            } catch (e) {
-                console.error('Validation error:', e);
-            }
-            return { valid: true };
-        }
-
-        async function saveItem() {
-            let data;
-
-            if (itemViewMode === 'json') {
-                const jsonStr = itemEditor.getValue();
-                try {
-                    data = JSON.parse(jsonStr);
-                } catch (e) {
-                    const errorDetail = { message: 'Invalid JSON: ' + e.message, errors: [{ message: e.message, field: 'JSON', item: { _raw: jsonStr } }] };
-                    window.lastItemError = errorDetail;
-                    document.getElementById('item-error').innerText = '❌ Invalid JSON: Click for details';
-                    document.getElementById('item-error').style.display = 'block';
+                if (!res.ok) {
+                    const err = await res.json();
+                    alert(err.detail || 'Failed to create project');
                     return;
                 }
-            } else {
-                data = getFormData();
-            }
 
-            if (Object.keys(data).length === 0) {
-                const errorDetail = { message: 'Item cannot be empty', errors: [] };
-                window.lastItemError = errorDetail;
-                document.getElementById('item-error').innerText = '❌ Item cannot be empty: Click for details';
-                document.getElementById('item-error').style.display = 'block';
-                return;
-            }
-
-            document.getElementById('item-error').style.display = 'none';
-
-            const validation = await validateItemData(data);
-            console.log('Validating item:', data);
-            console.log('Validation result:', validation);
-
-            if (!validation.valid) {
-                console.log('Showing validation error UI');
-                const errorMsg = 'Schema validation failed: ' + validation.fields.join(', ');
-                const errorDetail = {
-                    message: errorMsg, errors: validation.errors.map(e => ({
-                        message: e.message,
-                        field: e.instancePath.replace('/', '') || 'root',
-                        path: [e.instancePath.replace('/', '')],
-                        item: data
-                    }))
-                };
-                window.lastItemError = errorDetail;
-                document.getElementById('item-error').innerText = '❌ ' + errorMsg + ': Click for details';
-                document.getElementById('item-error').style.display = 'block';
-                window.validationErrors = validation.errors;
-                highlightRowWithError(validation);
-                highlightEditorErrors(validation, data);
-                return;
-            }
-
-            try {
-                if (itemMode === 'add') {
-                    await saveSingleItem(data);
-                    tableData.push(data);
-                } else if (itemMode === 'edit') {
-                    const itemId = tableData[editIndex].id || tableData[editIndex]._id || editIndex;
-                    await updateSingleItem(itemId, data);
-                    tableData[editIndex] = data;
-                }
-                closeItemModal();
-                renderTable();
+                document.getElementById('project-id').value = '';
+                document.getElementById('project-title').value = '';
+                document.getElementById('project-desc').value = '';
+                loadProjects();
             } catch (e) {
-                document.getElementById('item-error').innerText = '❌ ' + e.message + ': Click for details';
-                document.getElementById('item-error').style.display = 'block';
+                alert('Error: ' + e.message);
             }
         }
 
-        async function saveSingleItem(data) {
-            const res = await fetch(`/api/v1/r/${activeProject}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                const errorDetail = err.detail || { message: err.detail?.message || 'Failed to save item' };
-                window.lastItemError = {
-                    message: errorDetail.message,
-                    errors: errorDetail.errors?.map(e => ({ ...e, item: data }))
-                };
-                throw new Error(errorDetail.message || err.detail || 'Failed to save item');
-            }
-            return await res.json();
+        function selectProject(projectId) {
+            localStorage.setItem('active_project', projectId);
+            window.location.href = '/resources';
         }
 
-        async function updateSingleItem(itemId, data) {
-            const res = await fetch(`/api/v1/r/${activeProject}/${itemId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                const errorDetail = err.detail || { message: err.detail?.message || 'Failed to update item' };
-                window.lastItemError = {
-                    message: errorDetail.message,
-                    errors: errorDetail.errors?.map(e => ({ ...e, item: data }))
-                };
-                throw new Error(errorDetail.message || err.detail || 'Failed to update item');
-            }
-            return await res.json();
+        function editProject(id) {
+            const p = projects.find(x => x.id === id);
+            if (!p) return;
+            document.getElementById('edit-id').value = id;
+            document.getElementById('edit-title').value = p.title || '';
+            document.getElementById('edit-desc').value = p.description || '';
+            document.getElementById('edit-modal').style.display = 'flex';
         }
 
-        function showItemErrorModal() {
-            if (window.lastItemError) {
-                showErrorModal(window.lastItemError);
-            }
+        function closeEditModal() {
+            document.getElementById('edit-modal').style.display = 'none';
         }
 
-        function highlightRowWithError(validation) {
-            const rowIndex = itemMode === 'edit' ? editIndex : tableData.length;
-            const row = document.querySelector(`[data-row-index="${rowIndex}"]`);
-            if (row) {
-                row.style.background = 'rgba(220, 53, 69, 0.2)';
-                row.style.border = '2px solid #dc3545';
-                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }
-
-        function clearRowHighlights() {
-            document.querySelectorAll('[data-row-index]').forEach(row => {
-                row.style.background = '';
-                row.style.border = '';
-            });
-        }
-
-        function clearEditorErrors() {
-            if (itemEditor && window.editorDecorationIds) {
-                itemEditor.deltaDecorations(window.editorDecorationIds, []);
-                window.editorDecorationIds = [];
-            }
-            if (editor && window.mainEditorDecorationIds) {
-                editor.deltaDecorations(window.mainEditorDecorationIds, []);
-                window.mainEditorDecorationIds = [];
-            }
-        }
-
-        function highlightEditorErrorsFromBackend(errors) {
-            if (!Array.isArray(errors) || !editor) return;
-
-            clearEditorErrors();
-
-            const content = editor.getValue(); // still needed for line mapping
-            const lines = content.split('\n');
-            const decorations = [];
-
-            errors.forEach(err => {
-                const errorMessage = err.message;
-                const errorField = err.field;
-                const errorItem = err.item;
-
-                if (!errorItem) return;
-
-                // 🔍 Find item position by matching unique signature
-                let itemStartLine = -1;
-
-                // Try to find a unique key (id is best)
-                const uniqueKey = errorItem.id
-                    ? `"id": "${errorItem.id}"`
-                    : Object.keys(errorItem)[0]
-                        ? `"${Object.keys(errorItem)[0]}"`
-                        : null;
-
-                if (!uniqueKey) return;
-
-                for (let i = 0; i < lines.length; i++) {
-                    if (lines[i].includes(uniqueKey)) {
-                        // walk backwards to find `{`
-                        for (let j = i; j >= 0; j--) {
-                            if (lines[j].trim().startsWith('{')) {
-                                itemStartLine = j;
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                }
-
-                if (itemStartLine === -1) return;
-
-                let foundLine = -1;
-
-                // 🎯 Highlight field if exists
-                if (errorField) {
-                    const regex = new RegExp(`"(${errorField})"\\s*:`);
-
-                    for (let i = itemStartLine; i < lines.length && i < itemStartLine + 100; i++) {
-                        if (regex.test(lines[i])) {
-                            foundLine = i;
-                            break;
-                        }
-
-                        if (lines[i].includes('}')) break;
-                    }
-                }
-
-                // fallback → highlight whole object
-                if (foundLine === -1) {
-                    foundLine = itemStartLine;
-                }
-
-                decorations.push({
-                    range: new monaco.Range(
-                        foundLine + 1,
-                        1,
-                        foundLine + 1,
-                        lines[foundLine].length + 1
-                    ),
-                    options: {
-                        isWholeLine: true,
-                        className: 'editor-error-line',
-                        glyphMarginClassName: 'editor-error-glyph',
-                        glyphMarginHoverMessage: {
-                            value: `❌ ${errorMessage}`
-                        }
-                    }
-                });
-            });
-
-            if (decorations.length > 0) {
-                window.mainEditorDecorationIds =
-                    editor.deltaDecorations(window.mainEditorDecorationIds || [], decorations);
-            }
-        }
-
-        function highlightEditorErrors(validation, data) {
-            if (!validation || !validation.errors || !itemEditor) return;
-
-            clearEditorErrors();
-
-            const decorations = [];
-            validation.errors.forEach(error => {
-                const path = error.instancePath.replace('/', '').split('/').filter(Boolean);
-
-                if (path.length === 0) return;
-
-                const fieldName = path[path.length - 1];
-                let searchIn = data;
-                for (const p of path.slice(0, -1)) {
-                    searchIn = searchIn[p];
-                    if (!searchIn) return;
-                }
-
-                const jsonContent = itemEditor.getValue();
-                const regex = new RegExp(`"(${fieldName})"\\s*:`);
-
-                const lines = jsonContent.split('\n');
-                for (let i = 0; i < lines.length; i++) {
-                    if (regex.test(lines[i])) {
-                        decorations.push({
-                            range: new monaco.Range(i + 1, 1, i + 1, lines[i].length + 1),
-                            options: {
-                                isWholeLine: true,
-                                className: 'editor-error-line',
-                                glyphMarginClassName: 'editor-error-glyph',
-                                glyphMarginHoverMessage: { value: error.message }
-                            }
-                        });
-                        break;
-                    }
-                }
-            });
-
-            if (decorations.length > 0) {
-                window.editorDecorationIds = itemEditor.deltaDecorations([], decorations);
-            }
-        }
-
-        async function deleteRow(idx) {
-            if (!confirm('Delete this row?')) return;
-            const item = tableData[idx];
-            const itemId = item.id || item._id || idx;
-            try {
-                await deleteSingleItem(itemId);
-                tableData.splice(idx, 1);
-                renderTable();
-            } catch (e) {
-                alert('Failed to delete: ' + e.message);
-            }
-        }
-
-        async function deleteSingleItem(itemId) {
-            const res = await fetch(`/api/v1/r/${activeProject}/${itemId}`, {
-                method: 'DELETE'
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.detail?.message || err.detail || 'Failed to delete item');
-            }
-            return await res.json();
-        }
-
-        async function saveTableData() {
-            document.getElementById('save-btn').innerText = "Saving...";
-            document.getElementById('status').innerText = "";
+        async function saveEdit() {
+            const id = document.getElementById('edit-id').value;
+            const title = document.getElementById('edit-title').value.trim();
+            const description = document.getElementById('edit-desc').value.trim();
 
             try {
-                const res = await fetch(`/api/v1/r/${activeProject}/bulk/update`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(tableData)
-                });
-
-                if (res.ok) {
-                    document.getElementById('save-btn').innerText = "Save (Ctrl+S)";
-                    const statusEl = document.getElementById('status');
-                    statusEl.innerText = "✅ Saved " + new Date().toLocaleTimeString();
-                    statusEl.style.background = '';
-                    statusEl.style.color = '#28a745';
-                    statusEl.style.display = '';
-                    statusEl.style.padding = '';
-                    statusEl.style.borderRadius = '';
-                    statusEl.style.border = '';
-                    statusEl.style.cursor = '';
-                    statusEl.onclick = null;
-
-                    const filterQuery = document.getElementById('filter-input').value.trim();
-                    const [allRes, filteredRes] = await Promise.all([
-                        fetch(`/api/v1/r/${activeProject}`),
-                        filterQuery ? fetch(`/api/v1/r/${activeProject}?filter=${encodeURIComponent(filterQuery)}`) : Promise.resolve({ json: () => [] })
-                    ]);
-
-                    tableData = await allRes.json() || [];
-                    filteredData = filterQuery ? (await filteredRes.json() || []) : [...tableData];
-                    editor.setValue(JSON.stringify(tableData, null, 4));
-                    renderTable();
-                } else {
-                    const err = await res.json();
-                    document.getElementById('save-btn').innerText = "Save (Ctrl+S)";
-                    const errorMsg = err.detail || 'Save Failed';
-                    const statusEl = document.getElementById('status');
-                    statusEl.innerText = "❌ " + (typeof errorMsg === 'object' ? errorMsg.message : errorMsg);
-                    statusEl.style.cursor = 'pointer';
-                    statusEl.style.background = '#dc3545';
-                    statusEl.style.color = 'white';
-                    statusEl.style.padding = '3px 12px';
-                    statusEl.style.borderRadius = '4px';
-                    statusEl.style.border = 'none';
-                    statusEl.style.display = 'inline-block';
-                    statusEl.title = 'Click to see details';
-                    statusEl.onclick = function () { showErrorModal(err.detail || errorMsg); };
-                    window.lastValidationError = errorMsg;
-                    throw new Error(typeof errorMsg === 'object' ? errorMsg.message : errorMsg);
-                }
-            } catch (e) {
-                document.getElementById('save-btn').innerText = "Save (Ctrl+S)";
-                if (e.message) document.getElementById('status').innerText = "❌ " + e.message;
-                throw e;
-            }
-        }
-
-        async function saveFullFile() {
-            if (!activeProject) return;
-            const content = editor.getValue();
-
-            try { JSON.parse(content); }
-            catch (e) {
-                document.getElementById('status').innerText = "❌ Invalid JSON";
-                return;
-            }
-
-            const btn = document.getElementById('save-btn');
-            const status = document.getElementById('status');
-
-            btn.innerText = "Saving...";
-            status.innerText = "";
-
-            try {
-                const res = await fetch(`/api/v1/r/${activeProject}/bulk/update`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: content
-                });
-
-                if (res.ok) {
-                    btn.innerText = "Save (Ctrl+S)";
-                    status.innerText = "✅ Saved " + new Date().toLocaleTimeString();
-                    status.style.background = '';
-                    status.style.color = '#28a745';
-                    status.style.display = '';
-                    status.style.padding = '';
-                    status.style.borderRadius = '';
-                    status.style.border = '';
-                    status.style.cursor = '';
-                    status.onclick = null;
-                    tableData = JSON.parse(content);
-                    filteredData = [...tableData];
-                    if (currentView === 'table') renderTable();
-                } else {
-                    const err = await res.json();
-                    btn.innerText = "Save (Ctrl+S)";
-                    const errorData = err.detail || 'Save Failed';
-                    status.innerText = "❌ " + (errorData.message || errorData);
-                    status.style.cursor = 'pointer';
-                    status.style.background = '#dc3545';
-                    status.style.color = 'white';
-                    status.style.padding = '6px 12px';
-                    status.style.borderRadius = '4px';
-                    status.style.border = 'none';
-                    status.style.display = 'inline-block';
-                    status.title = 'Click to see details';
-                    status.onclick = function () { showErrorModal(errorData); };
-                    const structuredErrors = errorData.errors;
-                    if (structuredErrors) {
-                        highlightEditorErrorsFromBackend(structuredErrors, content);
-                    }
-                }
-            } catch (e) {
-                btn.innerText = "Save (Ctrl+S)";
-                status.innerText = "❌ Save Failed";
-            }
-        }
-
-        function runTransform() {
-            const output = document.getElementById('output');
-            try {
-                const query = document.getElementById('query').value.trim();
-                const data = JSON.parse(editor.getValue());
-                if (!query) { output.innerText = JSON.stringify(data, null, 2); return; }
-
-                const result = new Function('data', '_', `
-                    try { return eval(\`${query}\`); }
-                    catch (e) { return "Error: " + e.message; }
-                `)(data, _);
-
-                output.innerText = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-                output.style.color = "#9cdcfe";
-            } catch (e) {
-                output.innerText = "// Error: " + e.message;
-                output.style.color = "#f44747";
-            }
-        }
-
-        function saveQuery() {
-            const q = document.getElementById('query').value;
-            if (!q) return;
-            let cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '[]');
-            cache = [q, ...cache.filter(x => x !== q)].slice(0, 15);
-            localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-            updateHistoryUI();
-        }
-
-        function loadQuery(val) {
-            if (!val) return;
-            document.getElementById('query').value = val;
-            runTransform();
-        }
-
-        function updateHistoryUI() {
-            const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '[]');
-            document.getElementById('queryHistory').innerHTML = '<option value="">Recent Queries...</option>' +
-                cache.map(q => `<option value="${q}">${q.substring(0, 40)}${q.length > 40 ? '...' : ''}</option>`).join('');
-        }
-
-        async function checkSchema() {
-            try {
-                const res = await fetch(`/api/v1/r/${activeProject}/schema`);
-                document.getElementById('schema-indicator').innerText = res.ok ? '✓ Schema' : '';
-            } catch { document.getElementById('schema-indicator').innerText = ''; }
-        }
-
-        function toggleSidePanel() {
-            sidePanelVisible = !sidePanelVisible;
-            const panel = document.getElementById('side-panel');
-            const btn = document.getElementById('toggle-panel-btn');
-            if (sidePanelVisible) {
-                panel.classList.remove('hidden');
-                btn.innerText = 'Transform ▶';
-            } else {
-                panel.classList.add('hidden');
-                btn.innerText = 'Transform ◀';
-            }
-        }
-
-        function showFilterHelp() {
-            document.getElementById('filter-help').style.display = 'block';
-        }
-
-        function openSchemaModal() {
-            if (!activeProject) return;
-            document.getElementById('schema-resource-name').innerText = activeProject;
-            document.getElementById('schema-modal').style.display = 'flex';
-            document.getElementById('schema-status').innerText = '';
-
-            if (!schemaEditor) {
-                require(['vs/editor/editor.main'], function () {
-                    schemaEditor = monaco.editor.create(document.getElementById('schema-editor'), {
-                        value: '{\n  "type": "object",\n  "properties": {\n    \n  }\n}',
-                        language: 'json',
-                        theme: 'vs-dark',
-                        automaticLayout: true,
-                        fontSize: 13,
-                        minimap: { enabled: false }
-                    });
-                    loadSchema();
-                });
-            } else { loadSchema(); }
-
-            checkSchema();
-        }
-
-        function closeSchemaModal() {
-            document.getElementById('schema-modal').style.display = 'none';
-        }
-
-        async function loadSchema() {
-            try {
-                const res = await fetch(`/api/v1/r/${activeProject}/schema`);
-                if (res.ok) {
-                    const schema = await res.json();
-                    schemaEditor.setValue(JSON.stringify(schema, null, 4));
-                } else {
-                    schemaEditor.setValue('{\n  "type": "object",\n  "properties": {\n    \n  }\n}');
-                }
-            } catch {
-                schemaEditor.setValue('{\n  "type": "object",\n  "properties": {\n    \n  }\n}');
-            }
-        }
-
-        async function saveSchema() {
-            const content = schemaEditor.getValue();
-            const status = document.getElementById('schema-status');
-            try { JSON.parse(content); }
-            catch (e) { status.innerText = "❌ Invalid JSON"; return; }
-
-            try {
-                const res = await fetch(`/api/v1/r/${activeProject}/schema`, {
+                const res = await fetch(`/api/v1/projects/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: content
+                    body: JSON.stringify({ title, description })
                 });
-                if (res.ok) {
-                    status.innerText = "✅ Schema saved";
-                    document.getElementById('schema-indicator').innerText = '✓ Schema';
-                } else {
+
+                if (!res.ok) {
                     const err = await res.json();
-                    status.innerText = "❌ " + (err.detail || 'Failed');
+                    alert(err.detail || 'Failed to update project');
+                    return;
                 }
-            } catch { status.innerText = "❌ Save failed"; }
+
+                closeEditModal();
+                loadProjects();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
         }
 
-        async function deleteSchema() {
-            if (!confirm('Delete schema?')) return;
+        async function deleteProject(id) {
+            if (!confirm(`Delete project "${id}"? This will delete all resources and data in this project.`)) {
+                return;
+            }
+
             try {
-                const res = await fetch(`/api/v1/r/${activeProject}/schema`, { method: 'DELETE' });
-                if (res.ok) {
-                    document.getElementById('schema-status').innerText = "✅ Schema deleted";
-                    document.getElementById('schema-indicator').innerText = '';
-                    closeSchemaModal();
+                const res = await fetch(`/api/v1/projects/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    alert(err.detail || 'Failed to delete project');
+                    return;
                 }
-            } catch { document.getElementById('schema-status').innerText = "❌ Delete failed"; }
+
+                if (localStorage.getItem('active_project') === id) {
+                    localStorage.removeItem('active_project');
+                }
+
+                loadProjects();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
         }
+
+        loadProjects();
     </script>
 </body>
-
 </html>
