@@ -446,8 +446,10 @@ def validate_against_schema(data: Any, schema: Dict) -> tuple[bool, Optional[Dic
 # --- FUNCTION UTILITIES ---
 
 
-def get_function(name: str) -> Optional[Dict]:
-    path = os.path.join(FUNCTIONS_DIR, f"{name}.json")
+def get_function(name: str, project_id: str) -> Optional[Dict]:
+    project_dir = get_project_dir(project_id)
+    functions_dir = os.path.join(project_dir, "functions")
+    path = os.path.join(functions_dir, f"{name}.json")
     if not os.path.exists(path):
         return None
     try:
@@ -457,16 +459,44 @@ def get_function(name: str) -> Optional[Dict]:
         return None
 
 
-def save_function_data(name: str, func_data: Dict):
-    path = os.path.join(FUNCTIONS_DIR, f"{name}.json")
+def save_function_data(name: str, project_id: str, func_data: Dict):
+    project_dir = get_project_dir(project_id)
+    functions_dir = os.path.join(project_dir, "functions")
+    if not os.path.exists(functions_dir):
+        os.makedirs(functions_dir)
+    path = os.path.join(functions_dir, f"{name}.json")
     with open(path, "w") as f:
         json.dump(func_data, f, indent=4)
 
 
-def remove_function_file(name: str):
-    path = os.path.join(FUNCTIONS_DIR, f"{name}.json")
+def remove_function_file(name: str, project_id: str):
+    project_dir = get_project_dir(project_id)
+    functions_dir = os.path.join(project_dir, "functions")
+    path = os.path.join(functions_dir, f"{name}.json")
     if os.path.exists(path):
         os.remove(path)
+
+
+def list_project_functions(project_id: str) -> List[Dict]:
+    project_dir = get_project_dir(project_id)
+    functions_dir = os.path.join(project_dir, "functions")
+    if not os.path.exists(functions_dir):
+        return []
+    files = glob.glob(os.path.join(functions_dir, "*.json"))
+    funcs = []
+    for f in files:
+        name = os.path.basename(f).replace(".json", "")
+        func_data = get_function(name, project_id)
+        if func_data:
+            funcs.append(
+                {
+                    "name": name,
+                    "description": func_data.get("description", ""),
+                    "params": func_data.get("params", []),
+                    "resources": func_data.get("resources", []),
+                }
+            )
+    return funcs
 
 
 class DotDict(dict):
@@ -867,32 +897,20 @@ async def clear_logs():
 
 
 @app.get("/api/v1/functions")
-async def list_functions():
-    files = glob.glob(os.path.join(FUNCTIONS_DIR, "*.json"))
-    funcs = []
-    for f in files:
-        name = os.path.basename(f).replace(".json", "")
-        func_data = get_function(name)
-        if func_data:
-            funcs.append(
-                {
-                    "name": name,
-                    "description": func_data.get("description", ""),
-                    "params": func_data.get("params", []),
-                    "resources": func_data.get("resources", []),
-                }
-            )
-    return funcs
+async def list_functions(project_id: str = Depends(get_project_id)):
+    return list_project_functions(project_id)
 
 
 @app.post("/api/v1/functions")
-async def create_function(func: Dict = Body(...)):
+async def create_function(
+    func: Dict = Body(...), project_id: str = Depends(get_project_id)
+):
     name = func.get("name", "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="Function name is required")
     if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name):
         raise HTTPException(status_code=400, detail="Invalid function name")
-    if get_function(name):
+    if get_function(name, project_id):
         raise HTTPException(status_code=400, detail="Function already exists")
     func_data = {
         "name": name,
@@ -901,21 +919,23 @@ async def create_function(func: Dict = Body(...)):
         "resources": func.get("resources", []),
         "body": func.get("body", ""),
     }
-    save_function_data(name, func_data)
+    save_function_data(name, project_id, func_data)
     return {"status": "ok", "name": name}
 
 
 @app.get("/api/v1/functions/{name}")
-async def get_function_details(name: str):
-    func_data = get_function(name)
+async def get_function_details(name: str, project_id: str = Depends(get_project_id)):
+    func_data = get_function(name, project_id)
     if not func_data:
         raise HTTPException(status_code=404, detail="Function not found")
     return func_data
 
 
 @app.put("/api/v1/functions/{name}")
-async def update_function(name: str, func: Dict = Body(...)):
-    if not get_function(name):
+async def update_function(
+    name: str, func: Dict = Body(...), project_id: str = Depends(get_project_id)
+):
+    if not get_function(name, project_id):
         raise HTTPException(status_code=404, detail="Function not found")
     func_data = {
         "name": name,
@@ -924,15 +944,15 @@ async def update_function(name: str, func: Dict = Body(...)):
         "resources": func.get("resources", []),
         "body": func.get("body", ""),
     }
-    save_function_data(name, func_data)
+    save_function_data(name, project_id, func_data)
     return {"status": "ok"}
 
 
 @app.delete("/api/v1/functions/{name}")
-async def delete_func(name: str):
-    if not get_function(name):
+async def delete_func(name: str, project_id: str = Depends(get_project_id)):
+    if not get_function(name, project_id):
         raise HTTPException(status_code=404, detail="Function not found")
-    remove_function_file(name)
+    remove_function_file(name, project_id)
     return {"status": "ok"}
 
 
@@ -942,7 +962,7 @@ async def run_function(
     params: Dict = Body(default={}),
     project_id: str = Depends(get_project_id),
 ):
-    func_data = get_function(name)
+    func_data = get_function(name, project_id)
     if not func_data:
         raise HTTPException(status_code=404, detail="Function not found")
     result = execute_function(func_data, params, project_id)
@@ -955,7 +975,7 @@ async def test_function(
     params: Dict = Body(default={}),
     project_id: str = Depends(get_project_id),
 ):
-    func_data = get_function(name)
+    func_data = get_function(name, project_id)
     if not func_data:
         raise HTTPException(status_code=404, detail="Function not found")
     result = execute_function(func_data, params, project_id)

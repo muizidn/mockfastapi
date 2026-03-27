@@ -383,7 +383,7 @@ return users</code></pre>
         });
 
         async function loadFunctions() {
-            const res = await fetch('/api/v1/functions');
+            const res = await apiFetch('/api/v1/functions');
             functions = await res.json();
             renderFuncList();
         }
@@ -411,7 +411,7 @@ return users</code></pre>
         async function loadFunction(name) {
             if (isDirty && !confirm('Discard unsaved changes?')) return;
             
-            const res = await fetch(`/api/v1/functions/${name}`);
+            const res = await apiFetch(`/api/v1/functions/${name}`);
             if (!res.ok) return;
             
             currentFunc = await res.json();
@@ -526,7 +526,7 @@ return users</code></pre>
                 return;
             }
             
-            const res = await fetch('/api/v1/functions', {
+            const res = await apiFetch('/api/v1/functions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, description: desc, params: [], resources: [], body: '# Set result to return value\nresult = data' })
@@ -550,7 +550,7 @@ return users</code></pre>
             currentFunc.resources = selectedResources;
             currentFunc.body = editor.getValue();
             
-            const res = await fetch(`/api/v1/functions/${currentFunc.name}`, {
+            const res = await apiFetch(`/api/v1/functions/${currentFunc.name}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(currentFunc)
@@ -570,7 +570,7 @@ return users</code></pre>
             if (!currentFunc) return;
             if (!confirm(`Delete function ${currentFunc.name}?`)) return;
             
-            const res = await fetch(`/api/v1/functions/${currentFunc.name}`, { method: 'DELETE' });
+            const res = await apiFetch(`/api/v1/functions/${currentFunc.name}`, { method: 'DELETE' });
             
             if (res.ok) {
                 currentFunc = null;
